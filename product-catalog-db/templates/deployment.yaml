@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "product-catalog-db.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "product-catalog-db.labels" . | nindent 4 }}
+spec:
+  # Postgres with a single RWO PVC must stay at 1 replica.
+  replicas: 1
+  strategy:
+    # Recreate avoids two pods competing for the same RWO volume during rollouts.
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "product-catalog-db.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "product-catalog-db.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      containers:
+        - name: postgres
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: postgres
+              containerPort: {{ .Values.postgres.port }}
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: {{ .Values.existingSecret }}
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - {{ .Values.postgres.user }}
+                - -d
+                - {{ .Values.postgres.database }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - {{ .Values.postgres.user }}
+                - -d
+                - {{ .Values.postgres.database }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+              # Postgres refuses to start if the data directory is the mount root,
+              # so store data in a sub-path inside the volume.
+              subPath: pgdata
+
+      volumes:
+        - name: postgres-data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "product-catalog-db.fullname" . }}-pvc
+          {{- else }}
+          emptyDir: {}
+          {{- end }}

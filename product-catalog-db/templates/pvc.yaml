@@ -1,0 +1,21 @@
+{{- if .Values.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "product-catalog-db.fullname" . }}-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "product-catalog-db.labels" . | nindent 4 }}
+  annotations:
+    # Retain the volume when the release is deleted to prevent accidental data loss.
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - {{ .Values.persistence.accessMode }}
+  {{- if .Values.persistence.storageClassName }}
+  storageClassName: {{ .Values.persistence.storageClassName }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+{{- end }}

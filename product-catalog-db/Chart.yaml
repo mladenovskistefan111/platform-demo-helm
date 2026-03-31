@@ -1,0 +1,12 @@
+apiVersion: v2
+name: product-catalog-db
+description: PostgreSQL database for the product catalog service
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - postgresql
+  - database
+  - product-catalog
+maintainers:
+  - name: mladenovskistefan

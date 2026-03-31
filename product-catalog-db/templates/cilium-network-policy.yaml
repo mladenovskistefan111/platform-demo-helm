@@ -1,0 +1,53 @@
+{{- if .Values.networkPolicy.enabled }}
+# ── CiliumNetworkPolicy ───────────────────────────────────────────────────────
+# Principle of least privilege:
+#   Ingress  – only pods labelled {{ toYaml .Values.networkPolicy.clientPodSelector | trim }}
+#              in namespace {{ .Values.networkPolicy.clientNamespace }} may reach port {{ .Values.postgres.port }}.
+#   Egress   – DNS (UDP/TCP 53) is allowed so the pod can resolve service names.
+#              All other egress is denied.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ include "product-catalog-db.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "product-catalog-db.labels" . | nindent 4 }}
+spec:
+  # Apply this policy to the postgres pods in this namespace.
+  endpointSelector:
+    matchLabels:
+      {{- include "product-catalog-db.selectorLabels" . | nindent 6 }}
+
+  # ── Ingress ──────────────────────────────────────────────────────────────────
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            # The calling pod must carry this label ...
+            {{- range $k, $v := .Values.networkPolicy.clientPodSelector }}
+            {{ $k }}: {{ $v }}
+            {{- end }}
+            # ... and must live in the designated namespace.
+            # Cilium maps the k8s namespace label automatically.
+            io.kubernetes.io/metadata.name: {{ .Values.networkPolicy.clientNamespace }}
+      toPorts:
+        - ports:
+            - port: {{ .Values.postgres.port | quote }}
+              protocol: TCP
+
+  # ── Egress ───────────────────────────────────────────────────────────────────
+  egress:
+    # Allow DNS so the container can resolve service names inside the cluster.
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.io/metadata.name: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+{{- end }}

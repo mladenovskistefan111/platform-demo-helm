@@ -1,0 +1,43 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  product-catalog-service  ·  {{ .Release.Namespace }}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Verify the Secret exists before the pod starts:
+
+   kubectl get secret {{ .Values.existingSecret }} -n {{ .Release.Namespace }}
+
+   If it is missing, create it (replace <pw> with the real password):
+
+   kubectl create secret generic {{ .Values.existingSecret }} \
+     --namespace {{ .Release.Namespace }} \
+     --from-literal=DATABASE_URL="postgresql://catalog_user:<pw>@product-catalog-db.product-catalog-db.svc.cluster.local:5432/product_catalog"
+
+2. Watch the rollout:
+
+   kubectl rollout status deployment/{{ include "product-catalog-service.fullname" . }} \
+     -n {{ .Release.Namespace }}
+
+3. Service endpoints:
+
+   gRPC    : {{ include "product-catalog-service.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.grpcPort }}
+   Metrics : {{ include "product-catalog-service.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.metricsPort }}
+
+4. Image deployed (by digest — immutable):
+
+   {{ .Values.image.repository }}@{{ .Values.image.tag }}
+
+{{- if .Values.networkPolicy.enabled }}
+
+5. Cilium NetworkPolicy is ENABLED.
+
+   Ingress (gRPC {{ .Values.app.grpcPort }}) allowed from namespaces:
+   {{- range .Values.networkPolicy.allowedIngressNamespaces }}
+     - {{ . }}
+   {{- end }}
+
+   Egress allowed to:
+     - {{ .Values.networkPolicy.dbNamespace }} / {{ range $k,$v := .Values.networkPolicy.dbPodSelector }}{{ $k }}={{ $v }}{{ end }} on port {{ .Values.networkPolicy.dbPort }}
+     - kube-system/kube-dns on port 53
+
+   All other traffic is denied.
+{{- end }}

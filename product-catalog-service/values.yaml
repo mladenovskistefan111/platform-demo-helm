@@ -1,0 +1,102 @@
+# ── Global ────────────────────────────────────────────────────────────────────
+nameOverride: ""
+fullnameOverride: ""
+
+# ── Image ─────────────────────────────────────────────────────────────────────
+image:
+  repository: mladenovskistefan/product-catalog-service
+  # Pin to a digest for immutable, supply-chain-verified deployments.
+  # The SBOM and Cosign signature tags pushed alongside this digest are:
+  #   sha256-0678cae7afa33ccc85edc9a79ad9bcbea27005d93963ccc5f6a5ef30a7c73bbb.sbom
+  #   sha256-0678cae7afa33ccc85edc9a79ad9bcbea27005d93963ccc5f6a5ef30a7c73bbb.sig
+  tag: "sha256:0678cae7afa33ccc85edc9a79ad9bcbea27005d93963ccc5f6a5ef30a7c73bbb"
+  pullPolicy: IfNotPresent   # set to Never when using a locally loaded image
+
+# ── Replicas ──────────────────────────────────────────────────────────────────
+replicaCount: 1
+
+# ── Credentials (sourced from an externally-managed Secret) ───────────────────
+# The chart does NOT create the Secret.  Create it once with:
+#
+#   kubectl create secret generic product-catalog-secrets \
+#     --namespace product-catalog \
+#     --from-literal=DATABASE_URL="postgresql://catalog_user:<pw>@product-catalog-db.product-catalog-db.svc.cluster.local:5432/product_catalog"
+#
+existingSecret: product-catalog-secrets
+
+# ── Application ───────────────────────────────────────────────────────────────
+app:
+  grpcPort: 3550
+  metricsPort: 9090
+  enableTracing: "0"
+  enableProfiling: "0"
+
+# ── Resources ─────────────────────────────────────────────────────────────────
+resources:
+  requests:
+    cpu: 100m
+    memory: 16Mi
+  limits:
+    # No CPU limit intentionally — avoids CPU throttling on bursty gRPC workloads.
+    # Set one explicitly if your cluster policy requires it.
+    memory: 32Mi
+
+# ── Probes ────────────────────────────────────────────────────────────────────
+readinessProbe:
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+livenessProbe:
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# ── Service ───────────────────────────────────────────────────────────────────
+service:
+  type: ClusterIP
+  grpcPort: 3550
+  metricsPort: 9090
+
+# ── Horizontal Pod Autoscaler ─────────────────────────────────────────────────
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+# ── Network Policy (Cilium) ───────────────────────────────────────────────────
+networkPolicy:
+  enabled: true
+  # Namespace and selector for the DB — egress to it is explicitly allowed.
+  dbNamespace: product-catalog-db
+  dbPodSelector:
+    app: product-catalog-db
+  dbPort: 5432
+  # Namespaces allowed to call this service on the gRPC port.
+  # Add entries for each calling namespace (e.g. an API gateway namespace).
+  allowedIngressNamespaces:
+    - product-catalog      # same namespace (e.g. other sidecars / mesh)
+
+# ── Pod Security ──────────────────────────────────────────────────────────────
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# ── Pod disruption, scheduling ────────────────────────────────────────────────
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

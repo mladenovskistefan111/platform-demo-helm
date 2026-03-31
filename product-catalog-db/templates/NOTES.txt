@@ -1,0 +1,40 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  product-catalog-db  ·  {{ .Release.Namespace }}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Verify the Secret exists before the pod starts:
+
+   kubectl get secret {{ .Values.existingSecret }} \
+     -n {{ .Release.Namespace }}
+
+   If it is missing, create it:
+
+   kubectl create secret generic {{ .Values.existingSecret }} \
+     --namespace {{ .Release.Namespace }} \
+     --from-literal=POSTGRES_USER=catalog_user \
+     --from-literal=POSTGRES_PASSWORD=<your-password> \
+     --from-literal=POSTGRES_DB=product_catalog
+
+2. Watch the pod come up:
+
+   kubectl rollout status deployment/{{ include "product-catalog-db.fullname" . }} \
+     -n {{ .Release.Namespace }}
+
+3. Connection string for product-catalog-service:
+
+   Host : {{ include "product-catalog-db.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+   Port : {{ .Values.service.port }}
+   DB   : {{ .Values.postgres.database }}
+
+{{- if .Values.networkPolicy.enabled }}
+
+4. Cilium NetworkPolicy is ENABLED.
+   Only pods with label(s):
+   {{- range $k, $v := .Values.networkPolicy.clientPodSelector }}
+     {{ $k }}: {{ $v }}
+   {{- end }}
+   in namespace "{{ .Values.networkPolicy.clientNamespace }}" may connect on port {{ .Values.postgres.port }}.
+
+   To disable temporarily (not recommended in production):
+     helm upgrade {{ .Release.Name }} . --set networkPolicy.enabled=false
+{{- end }}

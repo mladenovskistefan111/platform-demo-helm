@@ -74,19 +74,8 @@ networkPolicy:
     app: product-catalog-service
 
 # ── Pod Security ──────────────────────────────────────────────────────────────
-podSecurityContext:
-  fsGroup: 999            # postgres group so the data volume is writable
-
-containerSecurityContext:
-  runAsNonRoot: true
-  runAsUser: 999          # postgres user
-  allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: false  # postgres writes to /tmp and /var/run
-  seccompProfile:
-    type: RuntimeDefault
-  capabilities:
-    drop:
-      - ALL
+podSecurityContext: {}
+containerSecurityContext: {}
 
 # ── Pod disruption, affinity, tolerations ─────────────────────────────────────
 podAnnotations: {}

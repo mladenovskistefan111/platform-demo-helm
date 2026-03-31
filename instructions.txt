@@ -1,0 +1,10 @@
+1. DB ON K8s IS TEMPORARY
+
+kubectl create namespace product-catalog-db
+kubectl create secret generic postgres-credentials \
+  --namespace product-catalog-db \
+  --from-literal=POSTGRES_USER=catalog_user \
+  --from-literal=POSTGRES_PASSWORD=password \
+  --from-literal=POSTGRES_DB=product_catalog
+helm install product-catalog-db ./product-catalog-db \
+  --namespace product-catalog-db

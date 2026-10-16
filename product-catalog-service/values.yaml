@@ -1,102 +1,215 @@
-# ── Global ────────────────────────────────────────────────────────────────────
+# product-catalog-service - Product Catalog Service - product API backed by PostgreSQL (Go)
+# Defaults are production-leaning (HA, hardened, NetworkPolicy on). See ../platform-demo/values-dev.yaml for a lightweight profile.
+
 nameOverride: ""
 fullnameOverride: ""
+component: backend
 
-# ── Image ─────────────────────────────────────────────────────────────────────
+# Shared with the umbrella chart (parent values override these).
+global:
+  imageRegistry: ""            # e.g. registry.example.com/mirror - prefixes every image
+  monitoring:
+    namespace: monitoring      # namespace of the observability stack (NetworkPolicy egress)
+    otlpEndpoint: http://alloy.monitoring.svc.cluster.local:4317   # OTLP/gRPC: traces, metrics, logs
+    pyroscopeAddr: http://alloy.monitoring.svc.cluster.local:4040  # profiles (Pyroscope push protocol, via Alloy)
+
 image:
+  registry: ""
   repository: mladenovskistefan/product-catalog-service
-  # Pin to a digest for immutable, supply-chain-verified deployments.
-  # The SBOM and Cosign signature tags pushed alongside this digest are:
-  #   sha256-0678cae7afa33ccc85edc9a79ad9bcbea27005d93963ccc5f6a5ef30a7c73bbb.sbom
-  #   sha256-0678cae7afa33ccc85edc9a79ad9bcbea27005d93963ccc5f6a5ef30a7c73bbb.sig
-  tag: "sha256:0678cae7afa33ccc85edc9a79ad9bcbea27005d93963ccc5f6a5ef30a7c73bbb"
-  pullPolicy: IfNotPresent   # set to Never when using a locally loaded image
+  tag: ""                       # defaults to Chart.appVersion (build/push this tag, or set digest)
+  digest: ""                    # sha256:... wins over tag (recommended once images are pushed)
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
 
-# ── Replicas ──────────────────────────────────────────────────────────────────
-replicaCount: 1
+replicaCount: 2
+revisionHistoryLimit: 3
+minReadySeconds: 5
+progressDeadlineSeconds: 300
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 25%
+    maxUnavailable: 0   # never drop capacity during a rollout
+terminationGracePeriodSeconds: 30
+preStopSleepSeconds: 5   # lets endpoints drain before SIGTERM
 
-# ── Credentials (sourced from an externally-managed Secret) ───────────────────
-# The chart does NOT create the Secret.  Create it once with:
-#
-#   kubectl create secret generic product-catalog-secrets \
-#     --namespace product-catalog \
-#     --from-literal=DATABASE_URL="postgresql://catalog_user:<pw>@product-catalog-db.product-catalog-db.svc.cluster.local:5432/product_catalog"
-#
-existingSecret: product-catalog-secrets
+serviceAccount:
+  create: true
+  name: ""
+  automount: false   # no API token in the pod
+  annotations: {}
 
-# ── Application ───────────────────────────────────────────────────────────────
-app:
-  grpcPort: 3550
-  metricsPort: 9090
-  enableTracing: "0"
-  enableProfiling: "0"
+containerPorts:
+  - name: grpc
+    containerPort: 3550
+    protocol: TCP
 
-# ── Resources ─────────────────────────────────────────────────────────────────
-resources:
-  requests:
-    cpu: 100m
-    memory: 16Mi
-  limits:
-    # No CPU limit intentionally — avoids CPU throttling on bursty gRPC workloads.
-    # Set one explicitly if your cluster policy requires it.
-    memory: 32Mi
+service:
+  type: ClusterIP
+  annotations: {}
+  ports:
+    - name: grpc
+      port: 3550
+      targetPort: grpc
+      appProtocol: grpc
 
-# ── Probes ────────────────────────────────────────────────────────────────────
+# Telemetry: OTLP/gRPC for traces+metrics+logs, Pyroscope push for profiles - both go to Alloy.
+telemetry:
+  k8sResourceAttributes: true   # adds k8s.pod.name / namespace / node via OTEL_RESOURCE_ATTRIBUTES
+
+# Plain environment. String values go through `tpl`, so {{ .Values... }} and $(VAR) work.
+env:
+  OTEL_SERVICE_NAME: "product-catalog-service"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "{{ .Values.global.monitoring.otlpEndpoint }}"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+  SERVICE_VERSION: "{{ .Chart.AppVersion }}"
+  PORT: "3550"
+  ENABLE_PROFILING: "1"
+  PYROSCOPE_ADDR: "{{ .Values.global.monitoring.pyroscopeAddr }}"
+  DATABASE_URL: "postgres://$(DB_USER):$(DB_PASSWORD)@{{ .Values.database.host }}:{{ .Values.database.port }}/$(DB_NAME)?sslmode=disable"
+
+# Where the DB lives and which Secret holds its credentials (created by the product-catalog-db chart).
+database:
+  host: product-catalog-db
+  port: 5432
+  secretName: product-catalog-db-credentials   # keys: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
+
+secretEnv:
+  - name: DB_USER
+    secretName: "{{ .Values.database.secretName }}"
+    key: POSTGRES_USER
+  - name: DB_PASSWORD
+    secretName: "{{ .Values.database.secretName }}"
+    key: POSTGRES_PASSWORD
+  - name: DB_NAME
+    secretName: "{{ .Values.database.secretName }}"
+    key: POSTGRES_DB
+extraEnv: []
+envFrom: []
+
+# product-catalog-service exits if Postgres is unreachable at startup; wait for it instead of crash-looping.
+initContainers:
+  - name: wait-for-db
+    image: busybox:1.37.0
+    command: ["sh", "-c", "until nc -z -w 2 {{ .Values.database.host }} {{ .Values.database.port }}; do echo waiting for database; sleep 2; done"]
+    resources:
+      requests: { cpu: 10m, memory: 8Mi }
+      limits: { cpu: 50m, memory: 16Mi }
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 65534
+      runAsGroup: 65534
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities: { drop: ["ALL"] }
+      seccompProfile: { type: RuntimeDefault }
+
+startupProbe: null
 readinessProbe:
-  initialDelaySeconds: 5
+  grpc:
+    port: 3550
   periodSeconds: 5
   timeoutSeconds: 3
   failureThreshold: 3
-
 livenessProbe:
-  initialDelaySeconds: 10
+  grpc:
+    port: 3550
   periodSeconds: 10
-  timeoutSeconds: 5
+  timeoutSeconds: 3
   failureThreshold: 3
 
-# ── Service ───────────────────────────────────────────────────────────────────
-service:
-  type: ClusterIP
-  grpcPort: 3550
-  metricsPort: 9090
+resources:
+  requests:
+    cpu: 50m
+    memory: 48Mi
+  limits:
+    cpu: "500m"
+    memory: 128Mi
 
-# ── Horizontal Pod Autoscaler ─────────────────────────────────────────────────
-autoscaling:
-  enabled: false
-  minReplicas: 1
-  maxReplicas: 5
-  targetCPUUtilizationPercentage: 80
-
-# ── Network Policy (Cilium) ───────────────────────────────────────────────────
-networkPolicy:
-  enabled: true
-  # Namespace and selector for the DB — egress to it is explicitly allowed.
-  dbNamespace: product-catalog-db
-  dbPodSelector:
-    app: product-catalog-db
-  dbPort: 5432
-  # Namespaces allowed to call this service on the gRPC port.
-  # Add entries for each calling namespace (e.g. an API gateway namespace).
-  allowedIngressNamespaces:
-    - product-catalog      # same namespace (e.g. other sidecars / mesh)
-
-# ── Pod Security ──────────────────────────────────────────────────────────────
+# Pod/container hardening (restricted Pod Security Standard).
 podSecurityContext:
   runAsNonRoot: true
-  runAsUser: 1000
-  runAsGroup: 1000
+  runAsUser: 10001
+  runAsGroup: 10001
   seccompProfile:
     type: RuntimeDefault
-
-containerSecurityContext:
+securityContext:
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
   capabilities:
-    drop:
-      - ALL
+    drop: ["ALL"]
 
-# ── Pod disruption, scheduling ────────────────────────────────────────────────
+# Writable scratch space for a read-only root filesystem.
+tmpVolume:
+  enabled: false
+  mountPath: /tmp
+  sizeLimit: 64Mi
+volumes: []
+volumeMounts: []
+
+# Horizontal Pod Autoscaler (needs metrics-server). Target is a % of the CPU *request*.
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: null
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+
+# Keeps at least one pod serving during voluntary disruptions (node drains, upgrades).
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+  # minAvailable: 1
+
+# Spread replicas over zones and nodes (soft: never blocks scheduling on small clusters).
+topologySpread:
+  enabled: true
+  constraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+
+# Zero-trust networking: only the listed callers may connect, only the listed dependencies may be reached.
+networkPolicy:
+  enabled: true
+  ingress:
+    from: [frontend, checkout-service, recommendation-service]          # service names in this namespace
+    fromNamespaces: []
+    fromCIDRs: []
+    extra: []
+  egress:
+    enabled: true
+    dns: true
+    monitoring: true
+    monitoringPorts: [4317, 4040]   # Alloy: OTLP/gRPC, Pyroscope
+    to:
+      - { name: product-catalog-db, port: 5432 }
+    extra: []
+
+ingress:
+  enabled: false
+
 podAnnotations: {}
+podLabels: {}
+annotations: {}
+commonLabels: {}
+priorityClassName: ""
 nodeSelector: {}
 tolerations: []
 affinity: {}

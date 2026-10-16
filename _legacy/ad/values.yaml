@@ -1,0 +1,11 @@
+namespace: ad
+
+monitoring:
+  otlpEndpoint: http://alloy.monitoring.svc.cluster.local:4318
+  pyroscopeAddr: http://pyroscope.monitoring.svc.cluster.local:4040
+
+service:
+  image: mladenovskistefan/ad-service@sha256:67c4c406770bf8986d6aa7b6743424e6336b39ea6fb6f0c7d7820427b6aa7057
+  port: 9555
+  metricsPort: 9464
+  replicas: 1

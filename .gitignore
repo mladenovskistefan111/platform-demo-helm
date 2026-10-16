@@ -1,0 +1,16 @@
+# Vendored copies of file:// dependencies. Recreate with `helm dependency update <chart>`;
+# Argo CD runs `helm dependency build` itself. Chart.lock files ARE committed.
+/platform-demo/charts/*.tgz
+/ad-service/charts/*.tgz
+/cart-redis/charts/*.tgz
+/cart-service/charts/*.tgz
+/checkout-service/charts/*.tgz
+/currency-service/charts/*.tgz
+/email-service/charts/*.tgz
+/frontend/charts/*.tgz
+/payment-service/charts/*.tgz
+/product-catalog-db/charts/*.tgz
+/product-catalog-service/charts/*.tgz
+/recommendation-service/charts/*.tgz
+/shipping-service/charts/*.tgz
+.DS_Store

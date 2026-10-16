@@ -1,0 +1,6 @@
+dependencies:
+- name: platform-common
+  repository: file://../platform-common
+  version: 0.1.0
+digest: sha256:d5c92fbf47da6a465ec788c5d699eef503f78a981dc3d687b7f93bc09e50133d
+generated: "2026-10-16T22:57:04.472230644+02:00"

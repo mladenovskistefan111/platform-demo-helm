@@ -1,0 +1,14 @@
+apiVersion: v2
+name: cart-redis
+description: Redis 7 datastore for the cart service
+type: application
+version: 0.2.0
+appVersion: "7.4.8"
+kubeVersion: ">=1.27.0-0"
+keywords: [platform-demo, cache]
+maintainers:
+  - name: mladenovskistefan111
+dependencies:
+  - name: platform-common
+    version: 0.1.0
+    repository: file://../platform-common

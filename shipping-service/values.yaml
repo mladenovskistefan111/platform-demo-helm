@@ -17,7 +17,7 @@ image:
   registry: ""
   repository: mladenovskistefan/shipping-service
   tag: ""                       # defaults to Chart.appVersion (build/push this tag, or set digest)
-  digest: ""                    # sha256:... wins over tag (recommended once images are pushed)
+  digest: "sha256:7621b70637e10f2196a032efeadafc89fd6f440d85314a0153d825d792f42e68"                  # mladenovskistefan/shipping-service:latest, OTLP build (2026-10)
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 

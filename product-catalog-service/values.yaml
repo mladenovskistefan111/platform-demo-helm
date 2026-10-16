@@ -17,7 +17,7 @@ image:
   registry: ""
   repository: mladenovskistefan/product-catalog-service
   tag: ""                       # defaults to Chart.appVersion (build/push this tag, or set digest)
-  digest: ""                    # sha256:... wins over tag (recommended once images are pushed)
+  digest: "sha256:9bbbdfe478e741670f2bf51e36682411ef3e6ff15b098a4ec33e1b5ddf58cff0"                  # mladenovskistefan/product-catalog-service:latest, OTLP build (2026-10)
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 

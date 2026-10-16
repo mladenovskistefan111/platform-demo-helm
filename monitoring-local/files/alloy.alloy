@@ -1,0 +1,113 @@
+// ------------------------------------------------------------
+// Grafana Alloy — OTLP/gRPC pipeline (Kubernetes variant of config.otlp.alloy)
+// Apps push traces, metrics and logs over OTLP gRPC (:4317).
+// Profiles are pushed with the Pyroscope SDK protocol (HTTP) to :4040.
+// ------------------------------------------------------------
+
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+    logs    = [otelcol.processor.batch.default.input]
+    traces  = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  output {
+    metrics = [otelcol.exporter.prometheus.mimir.input]
+    logs    = [otelcol.exporter.otlphttp.loki.input]
+    traces  = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+// --- traces -> Tempo ---
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+}
+
+// --- metrics -> Mimir (OTLP -> Prometheus naming, then remote_write) ---
+otelcol.exporter.prometheus "mimir" {
+  forward_to = [prometheus.remote_write.mimir.receiver]
+}
+
+prometheus.remote_write "mimir" {
+  endpoint {
+    url = "http://mimir:9009/api/v1/push"
+  }
+}
+
+// --- logs -> Loki native OTLP endpoint (service.name becomes the service_name label) ---
+otelcol.exporter.otlphttp "loki" {
+  client {
+    endpoint = "http://loki:3100/otlp"
+    tls {
+      insecure = true
+    }
+  }
+}
+
+// --- profiles: apps push with the Pyroscope SDK protocol, Alloy forwards ---
+pyroscope.receive_http "default" {
+  http {
+    listen_address = "0.0.0.0"
+    listen_port    = 4040
+  }
+  forward_to = [pyroscope.write.default.receiver]
+}
+
+pyroscope.write "default" {
+  endpoint {
+    url = "http://pyroscope:4040"
+  }
+}
+
+// --- stdout logs for pods that cannot speak OTLP (database, cache) ---
+// Selected by the chart label app.kubernetes.io/component; service_name matches the compose setup
+// (product-catalog-db, cart-redis).
+discovery.kubernetes "pods" {
+  role = "pod"
+  namespaces {
+    names = ["__APP_NAMESPACE__"]
+  }
+}
+
+discovery.relabel "infra_pods" {
+  targets = discovery.kubernetes.pods.targets
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_component"]
+    regex         = "database|cache"
+    action        = "keep"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+    target_label  = "service_name"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    target_label  = "pod"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_name"]
+    target_label  = "container"
+  }
+}
+
+loki.source.kubernetes "infra" {
+  targets    = discovery.relabel.infra_pods.output
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

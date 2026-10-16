@@ -1,0 +1,59 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: {{ .Values.gatewayClassName }}
+  namespace: {{ .Values.envoyProxy.namespace }}
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyDeployment:
+        replicas: {{ .Values.envoyProxy.replicas }}
+      envoyService:
+        type: {{ .Values.envoyProxy.service.type }}
+        {{- if eq .Values.envoyProxy.service.type "NodePort" }}
+        patch:
+          type: StrategicMerge
+          value:
+            spec:
+              ports:
+                - { name: http-80,   port: 80,  nodePort: {{ .Values.envoyProxy.service.httpNodePort }} }
+                - { name: https-443, port: 443, nodePort: {{ .Values.envoyProxy.service.httpsNodePort }} }
+        {{- end }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: {{ .Values.gatewayClassName }}
+spec:
+  controllerName: {{ .Values.controllerName }}
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: {{ .Values.gatewayClassName }}
+    namespace: {{ .Values.envoyProxy.namespace }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Values.gateway.name }}
+  namespace: {{ .Values.gateway.namespace }}
+spec:
+  gatewayClassName: {{ .Values.gatewayClassName }}
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      hostname: "*.{{ .Values.domain }}"
+      allowedRoutes:
+        namespaces: { from: All }
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "*.{{ .Values.domain }}"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - { kind: Secret, name: {{ .Values.gateway.tlsSecretName }} }
+      allowedRoutes:
+        namespaces: { from: All }

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: pyroscope-config, namespace: {{ .Release.Namespace }} }
+data:
+  pyroscope.yaml: |
+{{ .Files.Get "files/pyroscope.yaml" | indent 4 }}
+---
+{{ include "ml.workload" (dict "root" . "name" "pyroscope" "uid" 10001 "image" (include "ml.image" .Values.images.pyroscope)
+  "args" (list "-config.file=/etc/pyroscope/pyroscope.yaml")
+  "ports" (list (dict "name" "http" "port" 4040))
+  "probe" (dict "path" "/ready" "port" "http") "resources" .Values.resources.pyroscope
+  "checksum" (.Files.Get "files/pyroscope.yaml" | sha256sum) "configMap" "pyroscope-config" "dataPaths" (list "/data")) }}

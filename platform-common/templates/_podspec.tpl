@@ -3,11 +3,22 @@ Pod spec shared by Deployments and StatefulSets.
 Hardening applied here regardless of values:
   - enableServiceLinks: false   (no <SVC>_SERVICE_HOST/_PORT env pollution)
   - automountServiceAccountToken follows serviceAccount.automount (default false: no API credentials in pods)
+  - dnsConfig ndots 2 (override with .Values.dnsConfig): the cluster default of 5 makes a name such as
+    alloy.monitoring.svc.cluster.local walk every node search domain first; one that times out upstream makes musl
+    (Alpine) resolvers fail the lookup with EAI_AGAIN, so Python/Node/Java images silently lose telemetry.
 */}}
 {{- define "platform-common.podSpec" -}}
 serviceAccountName: {{ include "platform-common.serviceAccountName" . }}
 automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
 enableServiceLinks: false
+dnsConfig:
+  {{- if .Values.dnsConfig }}
+  {{- toYaml .Values.dnsConfig | nindent 2 }}
+  {{- else }}
+  options:
+    - name: ndots
+      value: "2"
+  {{- end }}
 {{- with .Values.imagePullSecrets }}
 imagePullSecrets:
   {{- toYaml . | nindent 2 }}

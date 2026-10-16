@@ -17,7 +17,7 @@ image:
   registry: ""
   repository: mladenovskistefan/cart-service
   tag: ""                       # defaults to Chart.appVersion (build/push this tag, or set digest)
-  digest: ""                    # sha256:... wins over tag (recommended once images are pushed)
+  digest: "sha256:308ff9e30d168d7229f01113f37c55cc4f184e9876b0f372ac349b1887a40837"                  # mladenovskistefan/cart-service:latest, OTLP build (2026-10)
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 

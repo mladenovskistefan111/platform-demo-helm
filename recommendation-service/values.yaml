@@ -17,7 +17,7 @@ image:
   registry: ""
   repository: mladenovskistefan/recommendation-service
   tag: ""                       # defaults to Chart.appVersion (build/push this tag, or set digest)
-  digest: ""                    # sha256:... wins over tag (recommended once images are pushed)
+  digest: "sha256:80152128fbd2fe8ea0f431391184e27c11fcb4a3d6337568849e8765d492fcab"                  # mladenovskistefan/recommendation-service:latest, OTLP build (2026-10)
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 

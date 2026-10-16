@@ -17,7 +17,7 @@ image:
   registry: ""
   repository: mladenovskistefan/email-service
   tag: ""                       # defaults to Chart.appVersion (build/push this tag, or set digest)
-  digest: ""                    # sha256:... wins over tag (recommended once images are pushed)
+  digest: "sha256:fbcd4206ebc55ca0e7c07dc88a4f05657e355f5dfe164a68a2a0221d26bc09e0"                  # mladenovskistefan/email-service:latest, OTLP build (2026-10)
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 

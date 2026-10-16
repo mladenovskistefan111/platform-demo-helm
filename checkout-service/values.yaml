@@ -17,7 +17,7 @@ image:
   registry: ""
   repository: mladenovskistefan/checkout-service
   tag: ""                       # defaults to Chart.appVersion (build/push this tag, or set digest)
-  digest: ""                    # sha256:... wins over tag (recommended once images are pushed)
+  digest: "sha256:1c27da3e9d23217c96c1a73a3c5a6eb14c04d8d4b3fba598ae0161fb98356100"                  # mladenovskistefan/checkout-service:latest, OTLP build (2026-10)
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 

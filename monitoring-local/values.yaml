@@ -1,0 +1,27 @@
+# Lightweight observability stack. Service names match what Alloy/Grafana/Tempo configs expect
+# (alloy, mimir, loki, tempo, pyroscope, grafana) and what the app charts point at
+# (alloy.monitoring.svc.cluster.local:4317 / :4040), so install it into the `monitoring` namespace.
+
+appNamespace: platform-demo        # namespace whose database/cache pod logs Alloy tails (they cannot speak OTLP)
+
+images:
+  alloy:     { repository: grafana/alloy,     tag: v1.14.2 }
+  mimir:     { repository: grafana/mimir,     tag: 3.0.4 }
+  loki:      { repository: grafana/loki,      tag: 3.6.7 }
+  tempo:     { repository: grafana/tempo,     tag: 2.10.3 }
+  pyroscope: { repository: grafana/pyroscope, tag: 1.19.1 }
+  grafana:   { repository: grafana/grafana,   tag: 12.4.1 }
+  pullPolicy: IfNotPresent
+
+grafana:
+  # Local demo: anonymous Admin, no login form (same as docker-compose). Never expose this beyond localhost.
+  anonymousAdmin: true
+  rootUrl: ""                      # e.g. https://grafana.platform-demo.test
+
+resources:
+  alloy:     { requests: { cpu: 50m,  memory: 128Mi }, limits: { memory: 512Mi } }
+  mimir:     { requests: { cpu: 100m, memory: 384Mi }, limits: { memory: 1Gi } }
+  loki:      { requests: { cpu: 50m,  memory: 192Mi }, limits: { memory: 512Mi } }
+  tempo:     { requests: { cpu: 50m,  memory: 192Mi }, limits: { memory: 768Mi } }
+  pyroscope: { requests: { cpu: 50m,  memory: 128Mi }, limits: { memory: 512Mi } }
+  grafana:   { requests: { cpu: 50m,  memory: 192Mi }, limits: { memory: 512Mi } }

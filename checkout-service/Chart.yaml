@@ -3,7 +3,7 @@ name: checkout-service
 description: Checkout Service - orchestrates PlaceOrder across six services (Go)
 type: application
 version: 0.2.0
-appVersion: "1.1.0"
+appVersion: "1.0.0"
 kubeVersion: ">=1.27.0-0"
 keywords: [platform-demo, backend]
 maintainers:

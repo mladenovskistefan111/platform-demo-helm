@@ -17,7 +17,7 @@ spec:
         valueFiles:
           - $values/gitops/kyverno/values.yaml
     - repoURL: https://github.com/mladenovskistefan111/platform-demo-helm.git
-      targetRevision: feat/kyverno
+      targetRevision: main
       ref: values
   destination: { name: in-cluster, namespace: kyverno }
   syncPolicy:

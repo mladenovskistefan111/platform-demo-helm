@@ -13,7 +13,7 @@ spec:
   project: security
   source:
     repoURL: https://github.com/mladenovskistefan111/platform-demo-helm.git
-    targetRevision: feat/kyverno
+    targetRevision: main
     path: policies
     helm:
       releaseName: policies

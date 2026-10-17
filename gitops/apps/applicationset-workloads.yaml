@@ -11,7 +11,7 @@ spec:
   generators:
     - git:
         repoURL: https://github.com/mladenovskistefan111/platform-demo-helm.git
-        revision: feat/kyverno
+        revision: main
         requeueAfterSeconds: 120
         files:
           - path: "envs/*/workloads.yaml"
@@ -29,7 +29,7 @@ spec:
       project: platform
       source:
         repoURL: https://github.com/mladenovskistefan111/platform-demo-helm.git
-        targetRevision: feat/kyverno
+        targetRevision: main
         path: '{{ .chart }}'
         helm:
           releaseName: '{{ .app }}'

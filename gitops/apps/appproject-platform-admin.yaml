@@ -5,7 +5,7 @@ metadata:
   name: platform-admin
   namespace: argocd
 spec:
-  description: Argo CD itself and the GitOps definitions (projects, ApplicationSets). Cluster-admin by design: keep it small.
+  description: "Argo CD itself and the GitOps definitions (projects, ApplicationSets). Cluster-admin by design, keep it small."
   sourceRepos:
     - https://github.com/mladenovskistefan111/platform-demo-helm.git
     - https://argoproj.github.io/argo-helm

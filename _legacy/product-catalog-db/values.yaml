@@ -1,9 +1,0 @@
-namespace: product-catalog-db
-
-image: mladenovskistefan/product-catalog-db:latest
-port: 5432
-storage: 2Gi
-
-database: productcatalog
-user: catalog
-password: catalog

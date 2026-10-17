@@ -1,6 +1,6 @@
 # platform-demo-helm
 
-Helm charts for the platform-demo application (the 10 services plus PostgreSQL and Redis). The observability stack (Alloy, Mimir, Loki, Tempo, Pyroscope, Grafana) is deployed separately — see `monitoring/`.
+Helm charts for the platform-demo application (the 10 services plus PostgreSQL and Redis). `product-catalog-db` is a **temporary** chart/image for local testing; on AWS the database is RDS and that chart is removed. The observability stack (Alloy, Mimir, Loki, Tempo, Pyroscope, Grafana) is deployed separately — see `monitoring/`.
 
 Context for everything below lives in the master [`../README.md`](../README.md) (architecture, wiring, observability contract, gotchas).
 

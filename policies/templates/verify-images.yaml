@@ -14,6 +14,13 @@ spec:
   {{- include "pd.actionSpec" (list . "verify-images" "workload") | nindent 2 }}
   webhookConfiguration:
     timeoutSeconds: 20
+  # Admission only: re-verifying every running image each hour (background scan) burns Docker Hub's pull quota for no gain.
+  evaluation:
+    background: { enabled: false }
+  {{- with $v.pullSecret }}
+  credentials:
+    secrets: [{{ . | quote }}]
+  {{- end }}
   matchConstraints:
     {{- include "pd.nsSelector" (list . "workload") | nindent 4 }}
     resourceRules:

@@ -45,7 +45,7 @@ namespaceSelector:
 {{/*
 A ValidatingPolicy rendered once per scope. dict keys:
   root, name, title, description, scopes (list), rules (YAML list), variables (YAML list, optional), validations (YAML list),
-  matchConditions (YAML list, optional), clusterWide (bool: no namespaceSelector), nsSelector (raw YAML, overrides), background (false: admission only; for rules that use request.userInfo or subresources)
+  matchConditions (YAML list, optional), clusterWide (bool: no namespaceSelector), nsSelector (raw YAML, overrides), controllers (list, restricts autogen to these pod controllers), background (false: admission only; for rules that use request.userInfo or subresources)
 The workload policy is called pd-<name>, other scopes pd-<name>-<scope>.
 */}}
 {{- define "pd.vpol" -}}
@@ -71,6 +71,11 @@ spec:
     {{- end }}
     resourceRules:
       {{- $p.rules | nindent 6 }}
+  {{- with $p.controllers }}
+  autogen:
+    podControllers:
+      controllers: {{ toJson . }}
+  {{- end }}
   {{- if eq (toString $p.background) "false" }}
   evaluation:
     background: { enabled: false }

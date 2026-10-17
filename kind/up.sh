@@ -55,6 +55,13 @@ if ! kubectl -n platform-demo get secret product-catalog-db-credentials >/dev/nu
     --from-literal=POSTGRES_PASSWORD="$(openssl rand -hex 16)" >/dev/null
 fi
 
+if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
+  step "Docker Hub read credential for Kyverno image verification (Secret kyverno/dockerhub-read, never in Git)"
+  kubectl create ns kyverno --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  kubectl -n kyverno create secret docker-registry dockerhub-read --docker-server=https://index.docker.io/v1/ \
+    --docker-username="$DOCKERHUB_USERNAME" --docker-password="$DOCKERHUB_TOKEN" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+fi
+
 step "Argo CD $ARGOCD_CHART_VERSION"
 helm upgrade --install argocd argo/argo-cd --version "$ARGOCD_CHART_VERSION" -n argocd --create-namespace \
   -f gitops/argocd/values.yaml --wait --timeout 8m

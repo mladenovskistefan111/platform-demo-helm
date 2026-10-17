@@ -35,6 +35,8 @@ applicationSet:
   resources: { requests: { cpu: 50m, memory: 96Mi }, limits: { memory: 256Mi } }
   readinessProbe: { enabled: true }
   livenessProbe: { enabled: true }
+redisSecretInit:
+  resources: { requests: { cpu: 10m, memory: 16Mi }, limits: { memory: 64Mi } }
 redis:
   resources: { requests: { cpu: 25m, memory: 32Mi }, limits: { memory: 128Mi } }
   readinessProbe: { enabled: true }

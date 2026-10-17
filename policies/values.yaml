@@ -62,14 +62,16 @@ images:
 # Keyless cosign verification of our own images: same issuer and identity pattern as the Helm CI gate (cosign verify).
 verifyImages:
   enabled: true
-  glob: index.docker.io/mladenovskistefan/*
+  # Matched against the image string as written in the pod spec (not the normalised index.docker.io/... form).
+  glob: mladenovskistefan/*
   issuer: https://token.actions.githubusercontent.com
   subjectRegExp: '^https://github.com/mladenovskistefan111/[a-z-]+/\.github/workflows/[a-z.-]+@.+$'
   rekorUrl: https://rekor.sigstore.dev
-  # Images that are knowingly unsigned. Each one is a PolicyException in the kyverno namespace (see exceptions.yaml).
+  # Images that are knowingly unsigned. Each one is a PolicyException in the kyverno namespace (see exceptions.yaml): the pod must
+  # carry app.kubernetes.io/name=<name> AND every container must use <imagePrefix>... (spec.images of an exception is not used on purpose).
   unsigned:
     - name: product-catalog-db
-      glob: index.docker.io/mladenovskistefan/product-catalog-db*
+      imagePrefix: "mladenovskistefan/product-catalog-db@sha256:"
       reason: Temporary hand-built local-testing image (replaced by RDS on AWS); same allow-list entry as in the Helm CI.
 
 # Who may change network policy and traffic-exposing objects (CiliumNetworkPolicy, NetworkPolicy, Gateway, HTTPRoute) in

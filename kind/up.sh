@@ -73,7 +73,7 @@ step "Waiting for Argo CD to deploy and heal every Application (up to 15 min)"
 for _ in $(seq 1 90); do
   total=$(kubectl -n argocd get applications --no-headers 2>/dev/null | wc -l)
   bad=$(kubectl -n argocd get applications --no-headers 2>/dev/null | awk '$2!="Synced" || $3!="Healthy"' | wc -l)
-  [ "$total" -ge 16 ] && [ "$bad" -eq 0 ] && break
+  [ "$total" -ge 18 ] && [ "$bad" -eq 0 ] && break
   sleep 10
 done
 kubectl -n argocd get applications
@@ -89,6 +89,10 @@ Done. Add this line to the Windows hosts file (C:\\Windows\\System32\\drivers\\e
       password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo
   https://grafana.$DOMAIN   Grafana (anonymous admin, local only)
   https://hubble.$DOMAIN    Hubble UI (flows, drops, authentication)
+
+Kyverno:  kubectl get vpol,ivpol,mpol,gpol      policies and their state
+          kubectl get polr -A                   audit results per resource
+          policies/tests/live/adversarial.sh    live admission tests (see policies/README.md)
 
 Trust kind/certs/ca.crt in your OS/browser to remove the certificate warning.
 MSG

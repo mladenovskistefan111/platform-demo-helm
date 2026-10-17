@@ -1,0 +1,112 @@
+# Kyverno policies for platform-demo (policies.kyverno.io/v1 CEL policy types). Environment overrides live in
+# ../envs/<env>/values/policies.yaml. Everything defaults to AUDIT: violations are reported (PolicyReports + kubectl
+# warnings) but nothing is blocked. Flip a policy to Deny in `actions` once its report is clean.
+
+# Audit | Deny for every policy unless `actions` says otherwise.
+defaultAction: Audit
+# Per-policy override, keyed by the policy name without the "pd-" prefix, e.g. { pod-identity: Deny }.
+actions: {}
+# The platform scope (monitoring, argocd) is reported but never enforced unless this is true.
+enforcePlatform: false
+
+# Namespaces by profile. Policies name them explicitly (not by label) so a namespace cannot opt out by being relabelled.
+scopes:
+  workload: [platform-demo]       # our services: the strict profile
+  platform: [monitoring, argocd]  # third-party stacks: registry/resources/probes checks, never the identity rules
+
+# Hostnames HTTPRoutes may claim.
+domain: platform-demo.test
+
+# Cilium derives the network identity of a pod from its labels, so any pod labelled app.kubernetes.io/name=frontend IS
+# the frontend to every CiliumNetworkPolicy. These are the only names a pod in a workload namespace may carry, and a pod
+# must run under the ServiceAccount of the same name (the chart creates one per workload).
+identity:
+  workloads:
+    - ad-service
+    - cart-redis
+    - cart-service
+    - checkout-service
+    - currency-service
+    - email-service
+    - frontend
+    - payment-service
+    - product-catalog-db
+    - product-catalog-service
+    - recommendation-service
+    - shipping-service
+
+# Registry/repository allow-list per scope, as image() normalises them (Docker Hub = index.docker.io, library/ for
+# official images). An entry ending in "/" allows the whole prefix. Digests are required except for the listed repos.
+images:
+  workload:
+    repositories:
+      - index.docker.io/mladenovskistefan/
+      - index.docker.io/library/redis
+      - index.docker.io/library/busybox
+    digestExempt: []
+  platform:
+    repositories:
+      - index.docker.io/grafana/alloy
+      - index.docker.io/grafana/grafana
+      - index.docker.io/grafana/loki
+      - index.docker.io/grafana/mimir
+      - index.docker.io/grafana/pyroscope
+      - index.docker.io/grafana/tempo
+      - quay.io/argoproj/argocd
+      - ecr-public.aws.com/docker/library/redis
+    # Argo CD's chart pins tags, not digests (upstream releases are immutable, but not by digest).
+    digestExempt:
+      - quay.io/argoproj/argocd
+      - ecr-public.aws.com/docker/library/redis
+
+# Keyless cosign verification of our own images: same issuer and identity pattern as the Helm CI gate (cosign verify).
+verifyImages:
+  enabled: true
+  # Matched against the image string as written in the pod spec (not the normalised index.docker.io/... form).
+  glob: mladenovskistefan/*
+  issuer: https://token.actions.githubusercontent.com
+  subjectRegExp: '^https://github.com/mladenovskistefan111/[a-z-]+/\.github/workflows/[a-z.-]+@.+$'
+  rekorUrl: https://rekor.sigstore.dev
+  # Verification reads manifests from Docker Hub; anonymous pulls are limited (100 / 6 h per IP) and a throttled lookup fails
+  # closed. Name of a kubernetes.io/dockerconfigjson Secret in the kyverno namespace holding a read-only Docker Hub token
+  # (kind/up.sh creates `dockerhub-read` when DOCKERHUB_USERNAME and DOCKERHUB_TOKEN are set). Empty = anonymous.
+  pullSecret: ""
+  # Images that are knowingly unsigned. Each one is a PolicyException in the kyverno namespace (see exceptions.yaml): the pod must
+  # carry app.kubernetes.io/name=<name> AND every container must use <imagePrefix>... (spec.images of an exception is not used on purpose).
+  unsigned:
+    - name: product-catalog-db
+      imagePrefix: "mladenovskistefan/product-catalog-db@sha256:"
+      reason: Temporary hand-built local-testing image (replaced by RDS on AWS); same allow-list entry as in the Helm CI.
+
+# Who may change network policy and traffic-exposing objects (CiliumNetworkPolicy, NetworkPolicy, Gateway, HTTPRoute) in
+# policed namespaces: Argo CD, Kyverno's own generator, the cluster's housekeeping controllers and cluster admins.
+protectedChanges:
+  users:
+    - system:serviceaccount:argocd:argocd-application-controller
+    - system:serviceaccount:kyverno:kyverno-background-controller
+    - system:serviceaccount:kube-system:namespace-controller
+    - system:serviceaccount:kube-system:generic-garbage-collector
+    - system:kube-controller-manager
+  groups:
+    - system:masters
+    - kubeadm:cluster-admins
+
+# kubectl exec / attach / debug into workload pods is refused unless the pod carries this annotation set to "true".
+breakGlass:
+  annotation: platform.demo/break-glass
+
+# Defaults generated into every namespace labelled platform.demo/profile=workload.
+baseline:
+  enabled: true
+  quota: { pods: "40", requestsCpu: "4", requestsMemory: 4Gi, limitsMemory: 8Gi }
+  limitRange:
+    defaultRequest: { cpu: 10m, memory: 32Mi }
+    default: { memory: 128Mi }
+
+# Further exceptions to ValidatingPolicies, each rendered as a PolicyException in the kyverno namespace. `condition` is CEL over the
+# admitted object (a pod); keep it as narrow as possible and give a reason.
+exceptions:
+  - name: argocd-controller-no-liveness
+    policies: [pd-require-probes-platform]
+    condition: "object.metadata.namespace == 'argocd' && object.metadata.name.startsWith('argocd-application-controller')"
+    reason: Upstream deliberately ships the application controller without a liveness probe (restarting an overloaded controller makes it worse).

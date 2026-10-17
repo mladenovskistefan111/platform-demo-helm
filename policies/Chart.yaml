@@ -1,0 +1,6 @@
+apiVersion: v2
+name: policies
+description: Kyverno cluster policies for platform-demo (identity, images, pod hardening, guardrails, baselines)
+type: application
+version: 0.1.0
+appVersion: "1.19"

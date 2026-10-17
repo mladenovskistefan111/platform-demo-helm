@@ -38,13 +38,28 @@ kubectl -n kube-system rollout status deploy/cilium-operator --timeout=5m
 step "TLS certificate for *.$DOMAIN (local CA in kind/certs/) -> Secret gateway-system/platform-tls"
 DOMAIN="$DOMAIN" bash kind/make-tls.sh
 
-step "Namespace platform-demo (Pod Security 'restricted') and database credentials (random, never in Git)"
-kubectl create ns platform-demo --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-kubectl label ns platform-demo pod-security.kubernetes.io/enforce=restricted --overwrite >/dev/null
+step "Namespace platform-demo (Pod Security 'restricted', workload profile) and database credentials (random, never in Git)"
+# Created with its labels in one request: the Kyverno policy pd-namespace-pod-security refuses a workload namespace without them.
+kubectl apply -f - >/dev/null <<NS
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-demo
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    platform.demo/profile: workload
+NS
 if ! kubectl -n platform-demo get secret product-catalog-db-credentials >/dev/null 2>&1; then
   kubectl -n platform-demo create secret generic product-catalog-db-credentials \
     --from-literal=POSTGRES_DB=product_catalog --from-literal=POSTGRES_USER=catalog_user \
     --from-literal=POSTGRES_PASSWORD="$(openssl rand -hex 16)" >/dev/null
+fi
+
+if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
+  step "Docker Hub read credential for Kyverno image verification (Secret kyverno/dockerhub-read, never in Git)"
+  kubectl create ns kyverno --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  kubectl -n kyverno create secret docker-registry dockerhub-read --docker-server=https://index.docker.io/v1/ \
+    --docker-username="$DOCKERHUB_USERNAME" --docker-password="$DOCKERHUB_TOKEN" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 fi
 
 step "Argo CD $ARGOCD_CHART_VERSION"
@@ -58,7 +73,7 @@ step "Waiting for Argo CD to deploy and heal every Application (up to 15 min)"
 for _ in $(seq 1 90); do
   total=$(kubectl -n argocd get applications --no-headers 2>/dev/null | wc -l)
   bad=$(kubectl -n argocd get applications --no-headers 2>/dev/null | awk '$2!="Synced" || $3!="Healthy"' | wc -l)
-  [ "$total" -ge 16 ] && [ "$bad" -eq 0 ] && break
+  [ "$total" -ge 18 ] && [ "$bad" -eq 0 ] && break
   sleep 10
 done
 kubectl -n argocd get applications
@@ -74,6 +89,10 @@ Done. Add this line to the Windows hosts file (C:\\Windows\\System32\\drivers\\e
       password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo
   https://grafana.$DOMAIN   Grafana (anonymous admin, local only)
   https://hubble.$DOMAIN    Hubble UI (flows, drops, authentication)
+
+Kyverno:  kubectl get vpol,ivpol,mpol,gpol      policies and their state
+          kubectl get polr -A                   audit results per resource
+          policies/tests/live/adversarial.sh    live admission tests (see policies/README.md)
 
 Trust kind/certs/ca.crt in your OS/browser to remove the certificate warning.
 MSG

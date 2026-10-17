@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: Namespace
+metadata: { name: platform-demo, labels: { kubernetes.io/metadata.name: platform-demo } }
+---
+apiVersion: v1
+kind: Namespace
+metadata: { name: monitoring, labels: { kubernetes.io/metadata.name: monitoring } }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: ours-digest, namespace: platform-demo, labels: { app.kubernetes.io/name: x } }
+spec: { containers: [{ name: c, image: "mladenovskistefan/frontend@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: redis-digest, namespace: platform-demo, labels: { app.kubernetes.io/name: x } }
+spec: { containers: [{ name: c, image: "redis@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: busybox-tag-and-digest, namespace: platform-demo, labels: { app.kubernetes.io/name: x } }
+spec: { containers: [{ name: c, image: "busybox:1.37.0@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: foreign-registry, namespace: platform-demo, labels: { app.kubernetes.io/name: x } }
+spec: { containers: [{ name: c, image: "evil.io/miner@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: other-dockerhub-repo, namespace: platform-demo, labels: { app.kubernetes.io/name: x } }
+spec: { containers: [{ name: c, image: "someone/else@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: tag-only, namespace: platform-demo, labels: { app.kubernetes.io/name: x } }
+spec: { containers: [{ name: c, image: "mladenovskistefan/frontend:1.0.0" }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: latest, namespace: platform-demo, labels: { app.kubernetes.io/name: x } }
+spec: { containers: [{ name: c, image: "mladenovskistefan/frontend:latest" }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: untagged, namespace: platform-demo, labels: { app.kubernetes.io/name: x } }
+spec: { containers: [{ name: c, image: "redis" }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: grafana-digest, namespace: monitoring, labels: { app.kubernetes.io/name: x } }
+spec: { containers: [{ name: c, image: "grafana/loki:3.6.7@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: grafana-tag-only, namespace: monitoring, labels: { app.kubernetes.io/name: x } }
+spec: { containers: [{ name: c, image: "grafana/loki:3.6.7" }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: argocd-tag-ok, namespace: monitoring, labels: { app.kubernetes.io/name: x } }
+spec: { containers: [{ name: c, image: "quay.io/argoproj/argocd:v3.5.4" }] }

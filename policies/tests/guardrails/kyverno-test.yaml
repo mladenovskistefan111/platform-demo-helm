@@ -1,0 +1,12 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata: { name: guardrails }
+policies: [../../.rendered/guardrails.yaml]
+resources: [resources.yaml]
+results:
+  - { policy: pd-restrict-service-types, isValidatingPolicy: true, kind: Service, resources: [clusterip, gateway-nodeport], result: pass }
+  - { policy: pd-restrict-service-types, isValidatingPolicy: true, kind: Service, resources: [nodeport, loadbalancer, external-ip], result: fail }
+  - { policy: pd-restrict-route-hostnames, isValidatingPolicy: true, kind: HTTPRoute, resources: [ours], result: pass }
+  - { policy: pd-restrict-route-hostnames, isValidatingPolicy: true, kind: HTTPRoute, resources: [foreign, suffix-trick, no-hostnames], result: fail }
+  - { policy: pd-namespace-pod-security, isValidatingPolicy: true, kind: Namespace, resources: [proper, monitoring, unrelated, platform-demo, gateway-system], result: pass }
+  - { policy: pd-namespace-pod-security, isValidatingPolicy: true, kind: Namespace, resources: [sneaky, argocd], result: fail }

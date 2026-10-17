@@ -1,0 +1,23 @@
+# Kyverno and the policies it enforces. Separate from `platform` on purpose: Kyverno needs CRDs, cluster roles and
+# cluster-scoped policy objects, which application workloads must never be able to create.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: security
+  namespace: argocd
+spec:
+  description: Kyverno (admission control) and the cluster policies. Cluster-scoped by design; sources are this repo and the Kyverno chart only.
+  sourceRepos:
+    - https://github.com/mladenovskistefan111/platform-demo-helm.git
+    - https://kyverno.github.io/kyverno/
+  destinations:
+    - { name: in-cluster, namespace: kyverno }
+  clusterResourceWhitelist:
+    - { group: "", kind: Namespace }
+    - { group: apiextensions.k8s.io, kind: CustomResourceDefinition }
+    - { group: rbac.authorization.k8s.io, kind: ClusterRole }
+    - { group: rbac.authorization.k8s.io, kind: ClusterRoleBinding }
+    - { group: kyverno.io, kind: "*" }
+    - { group: policies.kyverno.io, kind: "*" }
+    - { group: admissionregistration.k8s.io, kind: "*" }
+    - { group: reports.kyverno.io, kind: "*" }

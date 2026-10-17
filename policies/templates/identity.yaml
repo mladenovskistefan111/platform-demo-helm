@@ -1,0 +1,25 @@
+{{- /* Pod identity: Cilium derives a pod's network identity from its labels, so the label is a credential. */ -}}
+{{- $names := toJson .Values.identity.workloads -}}
+{{- include "pd.vpol" (dict "root" . "name" "pod-identity" "scopes" (list "workload")
+  "title" "Pod identity is bound to its ServiceAccount"
+  "description" "Cilium network policies and mutual authentication identify a pod by app.kubernetes.io/name. Only the known workload names may be used, a pod must run under the ServiceAccount of the same name, and the label cannot be changed on a running pod, so no other pod can impersonate a service."
+  "rules" (include "pd.podRules" .)
+  "variables" (printf `- name: appName
+  expression: >-
+    has(object.metadata.labels) && 'app.kubernetes.io/name' in object.metadata.labels
+    ? object.metadata.labels['app.kubernetes.io/name'] : ''
+- name: known
+  expression: '%s'` $names)
+  "validations" `- expression: variables.appName in variables.known
+  messageExpression: >-
+    'app.kubernetes.io/name is "' + variables.appName + '"; pods in this namespace must carry one of the known workload names (it is the network identity)'
+- expression: >-
+    has(object.spec.serviceAccountName) && object.spec.serviceAccountName == variables.appName
+  messageExpression: >-
+    'pod "' + variables.appName + '" must run under ServiceAccount "' + variables.appName + '", not "' +
+    (has(object.spec.serviceAccountName) ? object.spec.serviceAccountName : '') + '"'
+- expression: >-
+    request.operation != 'UPDATE' ||
+    (has(oldObject.metadata.labels) && 'app.kubernetes.io/name' in oldObject.metadata.labels &&
+     oldObject.metadata.labels['app.kubernetes.io/name'] == variables.appName)
+  message: app.kubernetes.io/name is the pod's network identity and cannot be changed after creation`) }}

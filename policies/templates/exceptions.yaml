@@ -1,0 +1,47 @@
+{{- /* Exceptions live in the kyverno namespace on purpose: Kyverno only honours PolicyExceptions from there
+       (gitops/kyverno/values.yaml), so nobody can exempt their own workload from inside its namespace.
+       Matched with CEL on the pod (label + exact digest-pinned image prefix) rather than spec.images, which
+       Kyverno before 1.19.1 ignored (the exception then skipped verification of the whole pod). */ -}}
+{{- range .Values.verifyImages.unsigned }}
+---
+apiVersion: policies.kyverno.io/v1
+kind: PolicyException
+metadata:
+  name: unsigned-{{ .name }}
+  namespace: kyverno
+  labels:
+    {{- include "pd.labels" $ | nindent 4 }}
+  annotations:
+    platform.demo/reason: {{ .reason | quote }}
+spec:
+  policyRefs:
+    - { name: pd-verify-images, kind: ImageValidatingPolicy }
+  matchConditions:
+    - name: expected-identity
+      expression: >-
+        has(object.metadata.labels) && object.metadata.labels['app.kubernetes.io/name'] == {{ .name | quote }}
+    - name: only-this-image
+      expression: >-
+        !has(object.spec.initContainers) && !has(object.spec.ephemeralContainers) &&
+        object.spec.containers.all(c, c.image.startsWith({{ .imagePrefix | quote }}))
+{{- end }}
+{{- range .Values.exceptions }}
+---
+apiVersion: policies.kyverno.io/v1
+kind: PolicyException
+metadata:
+  name: {{ .name }}
+  namespace: kyverno
+  labels:
+    {{- include "pd.labels" $ | nindent 4 }}
+  annotations:
+    platform.demo/reason: {{ .reason | quote }}
+spec:
+  policyRefs:
+    {{- range .policies }}
+    - { name: {{ . }}, kind: ValidatingPolicy }
+    {{- end }}
+  matchConditions:
+    - name: scope
+      expression: {{ .condition | quote }}
+{{- end }}

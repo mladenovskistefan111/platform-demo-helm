@@ -21,4 +21,8 @@ spec:
   destination: { name: in-cluster, namespace: argocd }
   syncPolicy:
     automated: { prune: true, selfHeal: true }
-    syncOptions: [ServerSideApply=true]
+    syncOptions: [CreateNamespace=true, ServerSideApply=true]
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: baseline
+        pod-security.kubernetes.io/warn: restricted

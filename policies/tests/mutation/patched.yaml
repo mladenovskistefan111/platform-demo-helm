@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bare
+  namespace: platform-demo
+  labels: { app.kubernetes.io/name: frontend, backstage.io/kubernetes-id: frontend }
+spec:
+  automountServiceAccountToken: false
+  securityContext: { seccompProfile: { type: RuntimeDefault } }
+  containers: [{ name: c, image: i }]

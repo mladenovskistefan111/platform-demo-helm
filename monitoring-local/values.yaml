@@ -5,12 +5,13 @@
 appNamespace: platform-demo        # namespace whose database/cache pod logs Alloy tails (they cannot speak OTLP)
 
 images:
-  alloy:     { repository: grafana/alloy,     tag: v1.14.2 }
-  mimir:     { repository: grafana/mimir,     tag: 3.0.4 }
-  loki:      { repository: grafana/loki,      tag: 3.6.7 }
-  tempo:     { repository: grafana/tempo,     tag: 2.10.3 }
-  pyroscope: { repository: grafana/pyroscope, tag: 1.19.1 }
-  grafana:   { repository: grafana/grafana,   tag: 12.4.1 }
+  # tag = which version, digest = what actually runs (the kubelet pulls by digest; Kyverno requires one). Bump both together.
+  alloy:     { repository: grafana/alloy,     tag: v1.14.2, digest: sha256:eadfe35ea52b26cbec4d4d780fbcc31edb31108c1c9e537ca59557a5a102c712 }
+  mimir:     { repository: grafana/mimir,     tag: 3.0.4, digest: sha256:686138d9f941508c99c931cc9e69bf9f6100dd4d2d623bf57b38d5c25ee645c1 }
+  loki:      { repository: grafana/loki,      tag: 3.6.7, digest: sha256:3c8fd3570dd9219951a60d3f919c7f31923d10baee578b77bc26c4a0b32d092d }
+  tempo:     { repository: grafana/tempo,     tag: 2.10.3, digest: sha256:cac9de2ac9f6da8efca5b64b690a7cb8c786a0c49cac7b4517dd1b0089a6c703 }
+  pyroscope: { repository: grafana/pyroscope, tag: 1.19.1, digest: sha256:d5d38187f7593fdf5643ba29e67099206e8d4dee6207f78d028ea3fe621cc04d }
+  grafana:   { repository: grafana/grafana,   tag: 12.4.1, digest: sha256:e932bd6ed0e026595b08483cd0141e5103e1ab7ff8604839ff899b8dc54cabcb }
   pullPolicy: IfNotPresent
 
 grafana:

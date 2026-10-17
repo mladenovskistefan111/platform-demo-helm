@@ -2,7 +2,7 @@
 
 Everything that is deployed: the Helm charts for the platform-demo application (10 services, PostgreSQL, Redis), the Gateway API entry point, a local monitoring stack, and the **GitOps configuration** that makes Argo CD deploy them. This repository is the single source of truth for what runs in each environment; the service repositories only build and publish images.
 
-Context for everything below lives in the master [`../README.md`](../README.md) (architecture, wiring, observability contract, CI/CD model, gotchas) and the session handoff [`../HANDOFF.md`](../HANDOFF.md).
+Context for everything below lives in the [docs repo](https://github.com/mladenovskistefan111/platform-demo-docs): the master [`README.md`](https://github.com/mladenovskistefan111/platform-demo-docs/blob/main/README.md) (architecture, wiring, observability contract, CI/CD model, gotchas) and the session handoff [`HANDOFF.md`](https://github.com/mladenovskistefan111/platform-demo-docs/blob/main/HANDOFF.md).
 
 > `product-catalog-db` is a **temporary** chart/image for local testing. On AWS the database is RDS and that chart (plus its allow-list entry in `.github/workflows/ci.yaml`) is deleted.
 
@@ -20,7 +20,8 @@ platform-demo-helm  (this repo, main)  <--- Argo CD polls --- ApplicationSets (g
 
 - **Charts** (`<service>/`, `platform-common/`, `platform-gateway/`, `monitoring-local/`) describe *how* something is deployed.
 - **`envs/<env>/`** describes *what* runs in an environment: `workloads.yaml` / `addons.yaml` (lists) and `values/<app>.yaml` (image digest, per-env settings). **Promotion = a pull request that changes a digest.**
-- **`gitops/`** is Argo CD's own configuration: install values, the root Application, projects and the two ApplicationSets. See [`gitops/README.md`](gitops/README.md).
+- **`gitops/`** is Argo CD's own configuration: install values, the root Application, projects, the two ApplicationSets and the Kyverno Applications. See [`gitops/README.md`](gitops/README.md).
+- **`policies/`** are the Kyverno admission policies (identity, images and signatures, pod hardening, exposure, break-glass, namespace baseline). See [`policies/README.md`](policies/README.md).
 
 ## Layout
 
@@ -33,9 +34,10 @@ monitoring-local/         single-replica Alloy, Mimir, Loki, Tempo, Pyroscope, G
 monitoring/               vendored upstream charts (unchanged), for real clusters
 platform-demo/            umbrella chart: `helm install` of the whole app without Argo CD (values-dev/prod/kind.yaml)
 envs/dev/                 workloads.yaml, addons.yaml, values/<app>.yaml, values/common.yaml
-gitops/                   argocd/values.yaml, bootstrap/root.yaml, apps/ (AppProjects, ApplicationSets, Argo CD self-management)
+gitops/                   argocd/values.yaml, kyverno/values.yaml, bootstrap/root.yaml, apps/ (AppProjects, ApplicationSets, Argo CD and Kyverno Applications)
+policies/                 Kyverno policies (CEL policy types) + tests; README explains each policy, rollout, exceptions, break-glass
 kind/                     up.sh / down.sh, cluster.yaml, cilium-values.yaml, make-tls.sh, README.md (runbook)
-.github/                  ci.yaml (PR gate), scripts/render-envs.py, CODEOWNERS, dependabot.yml
+.github/                  ci.yaml (PR gate), scripts/ (render-envs.py, policy-check.sh, inject-namespaces.py), CODEOWNERS, dependabot.yml
 ```
 
 Every service chart is ~6 tiny template files that call into `platform-common` plus a fully commented `values.yaml`, so behaviour is identical everywhere and a fix in the library reaches all charts.
@@ -81,6 +83,7 @@ Prerequisites either way: the service images on Docker Hub (pinned by digest, bu
 | Network | default-deny with allow-lists: `NetworkPolicy` (any CNI) or, with `networkPolicy.type: cilium`, a `CiliumNetworkPolicy` that also requires **SPIFFE/SPIRE mutual authentication** between workloads (ingress only from the documented callers; egress only to DNS, documented dependencies and Alloy) |
 | Config | `env` map (templated with `tpl`), `secretEnv` for credentials, shared `global.monitoring` endpoints, downward-API `OTEL_RESOURCE_ATTRIBUTES` |
 | Telemetry | OTLP/gRPC to Alloy for traces/metrics/logs, Pyroscope push for profiles — no scrape config needed |
+| Admission | In the cluster, Kyverno additionally requires: known app name bound to its own ServiceAccount, allowed registries + digest + our cosign signature, read-only root FS, requests/limits, probes, no API token (`policies/README.md`) |
 | Hygiene | `app.kubernetes.io/*` labels, `values.schema.json`, `NOTES.txt`, image precedence `digest > tag > appVersion`, `global.imageRegistry` |
 
 | Chart | Kind | Port | Called by | Calls |
@@ -119,7 +122,7 @@ helm dependency update <chart>                               # after changing pl
 
 Charts and the library share a version contract: bump `platform-common` and re-run `helm dependency update` in every chart that should pick it up (Argo CD runs `helm dependency build` itself; `Chart.lock` files are committed, the vendored `charts/*.tgz` are not).
 
-The pull-request pipeline (`.github/workflows/ci.yaml`, nothing runs on push): helm lint of every chart, render of the umbrella and of every env app, kubeconform (strict, Kubernetes + CRD schemas incl. Cilium/Gateway API/Argo CD), Trivy config scan (app charts must be clean, `monitoring-local` is report-only), a cosign gate (every deployed `mladenovskistefan/*` image pinned by digest and signed), secret scan and workflow lint.
+The pull-request pipeline (`.github/workflows/ci.yaml`, nothing runs on push): helm lint of every chart, render of the umbrella and of every env app, kubeconform (strict, Kubernetes + CRD schemas incl. Cilium/Gateway API/Argo CD), Trivy config scan (app charts must be clean, `monitoring-local` is report-only), a cosign gate (every deployed `mladenovskistefan/*` image pinned by digest and signed), **Kyverno policy tests** (unit tests for every policy, then every rendered workload/add-on of every environment is evaluated against the policies, so a chart change that admission would refuse fails the PR), secret scan and workflow lint.
 
 ## Verified
 

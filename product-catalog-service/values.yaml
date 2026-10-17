@@ -90,7 +90,7 @@ envFrom: []
 # product-catalog-service exits if Postgres is unreachable at startup; wait for it instead of crash-looping.
 initContainers:
   - name: wait-for-db
-    image: busybox:1.37.0
+    image: busybox:1.37.0@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e
     command: ["sh", "-c", "until nc -z -w 2 {{ .Values.database.host }} {{ .Values.database.port }}; do echo waiting for database; sleep 2; done"]
     resources:
       requests: { cpu: 10m, memory: 8Mi }

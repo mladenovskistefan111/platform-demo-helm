@@ -1,0 +1,14 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: pod-identity
+policies:
+  - ../../.rendered/identity.yaml
+resources:
+  - resources.yaml
+results:
+  - { policy: pd-pod-identity, isValidatingPolicy: true, kind: Pod, resources: [good], result: pass }
+  - { policy: pd-pod-identity, isValidatingPolicy: true, kind: Pod, resources: [stolen-label-default-sa], result: fail }
+  - { policy: pd-pod-identity, isValidatingPolicy: true, kind: Pod, resources: [stolen-label-other-sa], result: fail }
+  - { policy: pd-pod-identity, isValidatingPolicy: true, kind: Pod, resources: [unknown-name], result: fail }
+  - { policy: pd-pod-identity, isValidatingPolicy: true, kind: Pod, resources: [no-label], result: fail }

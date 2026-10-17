@@ -1,0 +1,61 @@
+{{- /* Safe defaults. Mutating Pods only (autogen off): Deployments stay exactly as rendered, so Argo CD sees no drift. */ -}}
+{{- define "pd.mpol" }}
+---
+apiVersion: policies.kyverno.io/v1
+kind: MutatingPolicy
+metadata:
+  name: pd-{{ .name }}
+  labels:
+    {{- include "pd.labels" .root | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: {{ .title | quote }}
+    policies.kyverno.io/description: {{ .description | quote }}
+spec:
+  failurePolicy: Ignore
+  autogen:
+    podControllers:
+      controllers: []
+  matchConstraints:
+    {{- include "pd.nsSelector" (list .root .scope) | nindent 4 }}
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+  matchConditions:
+    {{- .conditions | nindent 4 }}
+  mutations:
+    - patchType: ApplyConfiguration
+      applyConfiguration:
+        expression: >-
+          {{- .patch | nindent 10 }}
+{{- end -}}
+
+{{- include "pd.mpol" (dict "root" . "scope" "workload" "name" "default-no-api-token"
+  "title" "Pods get no API token unless they ask for one"
+  "description" "Sets automountServiceAccountToken=false when a pod does not say anything, so a compromised service has no Kubernetes API credentials."
+  "conditions" `- name: unset
+  expression: '!has(object.spec.automountServiceAccountToken)'`
+  "patch" `Object{ spec: Object.spec{ automountServiceAccountToken: false } }`) }}
+
+{{- include "pd.mpol" (dict "root" . "scope" "workload" "name" "default-seccomp-workload"
+  "title" "Default seccomp profile"
+  "description" "Adds seccompProfile RuntimeDefault to pods that do not set one."
+  "conditions" `- name: unset
+  expression: '!has(object.spec.securityContext) || !has(object.spec.securityContext.seccompProfile)'`
+  "patch" `Object{ spec: Object.spec{ securityContext: Object.spec.securityContext{ seccompProfile: Object.spec.securityContext.seccompProfile{ type: "RuntimeDefault" } } } }`) }}
+
+{{- include "pd.mpol" (dict "root" . "scope" "platform" "name" "default-seccomp-platform"
+  "title" "Default seccomp profile (platform namespaces)"
+  "description" "Adds seccompProfile RuntimeDefault to pods that do not set one."
+  "conditions" `- name: unset
+  expression: '!has(object.spec.securityContext) || !has(object.spec.securityContext.seccompProfile)'`
+  "patch" `Object{ spec: Object.spec{ securityContext: Object.spec.securityContext{ seccompProfile: Object.spec.securityContext.seccompProfile{ type: "RuntimeDefault" } } } }`) }}
+
+{{- include "pd.mpol" (dict "root" . "scope" "workload" "name" "backstage-kubernetes-id"
+  "title" "Label pods for the developer portal"
+  "description" "Copies app.kubernetes.io/name into backstage.io/kubernetes-id, the label the Backstage Kubernetes plugin uses to find a component's pods."
+  "conditions" `- name: has-name
+  expression: >-
+    has(object.metadata.labels) && 'app.kubernetes.io/name' in object.metadata.labels`
+  "patch" `Object{ metadata: Object.metadata{ labels: { "backstage.io/kubernetes-id": object.metadata.labels["app.kubernetes.io/name"] } } }`) }}

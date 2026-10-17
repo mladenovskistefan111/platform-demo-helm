@@ -1,0 +1,53 @@
+{{- $cs := `- name: containers
+  expression: >-
+    object.spec.containers + (has(object.spec.initContainers) ? object.spec.initContainers : [])` -}}
+
+{{- include "pd.vpol" (dict "root" . "name" "require-resources" "scopes" (list "workload" "platform")
+  "title" "Containers declare requests and a memory limit"
+  "description" "Every container needs cpu and memory requests and a memory limit, so the scheduler can place it and one pod cannot starve the node. (CPU limits are deliberately not required: they only throttle.)"
+  "rules" (include "pd.podRules" .) "variables" $cs
+  "validations" `- expression: >-
+    variables.containers.all(c, has(c.resources) && has(c.resources.requests) &&
+      'cpu' in c.resources.requests && 'memory' in c.resources.requests &&
+      has(c.resources.limits) && 'memory' in c.resources.limits)
+  messageExpression: >-
+    'containers without cpu+memory requests and a memory limit: ' +
+    variables.containers.filter(c, !(has(c.resources) && has(c.resources.requests) &&
+      'cpu' in c.resources.requests && 'memory' in c.resources.requests &&
+      has(c.resources.limits) && 'memory' in c.resources.limits)).map(c, c.name).join(', ')`) }}
+
+{{- include "pd.vpol" (dict "root" . "name" "readonly-rootfs" "scopes" (list "workload" "platform")
+  "title" "Root filesystem is read-only"
+  "description" "A writable root filesystem lets an attacker drop and run tools. Writable paths must be explicit volumes (tmpVolume in the charts)."
+  "rules" (include "pd.podRules" .) "variables" $cs
+  "validations" `- expression: >-
+    variables.containers.all(c, has(c.securityContext) && has(c.securityContext.readOnlyRootFilesystem) &&
+      c.securityContext.readOnlyRootFilesystem)
+  messageExpression: >-
+    'containers with a writable root filesystem: ' +
+    variables.containers.filter(c, !(has(c.securityContext) && has(c.securityContext.readOnlyRootFilesystem) &&
+      c.securityContext.readOnlyRootFilesystem)).map(c, c.name).join(', ')`) }}
+
+{{- include "pd.vpol" (dict "root" . "name" "require-probes" "scopes" (list "workload" "platform") "controllers" (list "deployments" "statefulsets" "daemonsets")
+  "matchConditions" `- name: not-a-job-pod
+  expression: >-
+    !has(object.metadata.ownerReferences) || !object.metadata.ownerReferences.exists(o, o.kind == 'Job')`
+  "title" "Containers have readiness and liveness probes"
+  "description" "Without probes Kubernetes routes traffic to pods that are not ready and never restarts hung ones. Pods of Jobs (run to completion) are exempt."
+  "rules" (include "pd.podRules" .)
+  "validations" `- expression: >-
+    object.spec.containers.all(c, has(c.readinessProbe) && has(c.livenessProbe))
+  messageExpression: >-
+    'containers without readiness+liveness probes: ' +
+    object.spec.containers.filter(c, !(has(c.readinessProbe) && has(c.livenessProbe))).map(c, c.name).join(', ')`) }}
+
+{{- include "pd.vpol" (dict "root" . "name" "service-account" "scopes" (list "workload")
+  "title" "No default ServiceAccount, no API token unless asked for"
+  "description" "Workloads run under their own ServiceAccount and get no Kubernetes API credentials (automountServiceAccountToken false)."
+  "rules" (include "pd.podRules" .)
+  "validations" `- expression: >-
+    has(object.spec.serviceAccountName) && object.spec.serviceAccountName != 'default'
+  message: pods must use a dedicated ServiceAccount, not "default"
+- expression: >-
+    has(object.spec.automountServiceAccountToken) && !object.spec.automountServiceAccountToken
+  message: automountServiceAccountToken must be false (these services do not talk to the Kubernetes API)`) }}

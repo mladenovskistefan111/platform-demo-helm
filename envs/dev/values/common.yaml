@@ -2,3 +2,10 @@
 global:
   networkPolicy:
     type: cilium        # CiliumNetworkPolicy with SPIFFE/SPIRE mutual authentication (see platform-common)
+
+# Laptop profile (same as platform-demo/values-dev.yaml): one replica, no HPA/PDB/spread.
+replicaCount: 1
+autoscaling: { enabled: false }
+podDisruptionBudget: { enabled: false }
+topologySpread: { enabled: false }
+preStopSleepSeconds: 0

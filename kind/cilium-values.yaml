@@ -27,15 +27,16 @@ authentication:
         server:
           dataStorage:
             enabled: false
-          # The SPIRE image runs as uid 1000 but the chart mounts a hostPath for the admin socket that
-          # Kubernetes creates as root:root 0755, so the server cannot bind it ("bind: permission denied").
-          # SPIRE 1.15 then hangs instead of exiting with the error. Fix the ownership before it starts.
-          initContainers:
-            - name: fix-socket-dir
-              image: docker.io/library/busybox:1.38.0@sha256:dc2d74b28e4cf8984fa52af1f39bc7c3d9c73760b41a74d629f5d11b1ab28616
-              command: ["sh", "-c", "chown 1000:1000 /tmp/spire-server/private && chmod 0750 /tmp/spire-server/private"]
-              volumeMounts:
-                - { name: spire-server-socket, mountPath: /tmp/spire-server/private }
+          # The SPIRE 1.15 image defaults to uid 1000, which breaks the chart in two ways on a plain cluster:
+          #  1. the hostPath directory for the admin socket is created root:root 0755, so the server cannot bind it
+          #     ("bind: permission denied"; SPIRE 1.15 then hangs instead of exiting), and
+          #  2. the cilium-init sidecar registers Cilium's identities through /proc/<pid>/root of the server process,
+          #     which Linux only allows across different users with CAP_SYS_PTRACE. Nothing is registered, every
+          #     handshake fails with "no SPIFFE ID" and mutually authenticated traffic is dropped.
+          # Running the server as root (as older SPIRE images did) fixes both.
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
 
 # Flow visibility, needed to prove what is (not) allowed and authenticated.
 hubble:

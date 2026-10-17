@@ -7,6 +7,9 @@ configs:
   params:
     # TLS terminates at the Cilium Gateway (see platform-gateway); in-cluster traffic is protected by Cilium.
     server.insecure: true
+    # Compare against what the API server would produce (dry-run apply) instead of a client-side diff; otherwise
+    # Gateway API routes and StatefulSets, whose fields the API server defaults, stay OutOfSync forever.
+    controller.diff.server.side: true
   cm:
     url: https://argocd.platform-demo.test
     # Poll Git every 2 minutes (default 3). Webhooks are not reachable from a laptop.

@@ -11,11 +11,7 @@ metadata:
     policies.kyverno.io/title: "Our images are signed by our pipelines"
     policies.kyverno.io/description: "Images from our Docker Hub namespace must carry a keyless cosign signature (classic tag format) made by a GitHub Actions workflow of one of our repositories - the same check the Helm CI runs before promotion. What is signed is what Trivy scanned: the release workflow promotes the scanned digest."
 spec:
-  {{- $spec := include "pd.actionSpec" (list . "verify-images" "workload") }}
-  {{- if $v.failurePolicy }}
-  {{- $spec = regexReplaceAll "failurePolicy: .*" $spec (printf "failurePolicy: %s" $v.failurePolicy) }}
-  {{- end }}
-  {{- $spec | nindent 2 }}
+  {{- include "pd.actionSpec" (list . "verify-images" "workload") | nindent 2 }}
   webhookConfiguration:
     timeoutSeconds: 20
   # Admission only: re-verifying every running image each hour (background scan) burns Docker Hub's pull quota for no gain.

@@ -3,8 +3,9 @@
 defaultAction: Deny
 enforcePlatform: false
 
-verifyImages:
-  # Docker Hub throttles anonymous pulls (100 per 6 h per IP) and a fresh `up.sh` uses most of them, so a signature LOOKUP can fail
-  # with TOOMANYREQUESTS. Until a read-only Docker Hub token is configured (pullSecret, see policies/README.md) a failed lookup
-  # admits the pod; a missing/invalid signature is still denied.
-  failurePolicy: Ignore
+actions:
+  # Signature verification reads manifests from Docker Hub at every pod admission. Anonymous pulls are limited to 100 per hour
+  # per IP and a fresh `kind/up.sh` already uses most of them, so a throttled lookup is an ERROR and an enforcing policy turns
+  # errors into denials (failurePolicy does not change that). Until a read-only Docker Hub token is configured
+  # (verifyImages.pullSecret, see policies/README.md) this one policy only reports. Remove this line once it is.
+  verify-images: Audit

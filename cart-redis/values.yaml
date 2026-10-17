@@ -1,0 +1,181 @@
+# cart-redis - Redis 7 datastore for the cart service
+# Defaults are production-leaning (HA, hardened, NetworkPolicy on). See ../platform-demo/values-dev.yaml for a lightweight profile.
+
+nameOverride: ""
+fullnameOverride: ""
+component: cache
+
+# Shared with the umbrella chart (parent values override these).
+global:
+  imageRegistry: ""            # e.g. registry.example.com/mirror - prefixes every image
+  monitoring:
+    namespace: monitoring      # namespace of the observability stack (NetworkPolicy egress)
+    otlpEndpoint: http://alloy.monitoring.svc.cluster.local:4317   # OTLP/gRPC: traces, metrics, logs
+    pyroscopeAddr: http://alloy.monitoring.svc.cluster.local:4040  # profiles (Pyroscope push protocol, via Alloy)
+
+image:
+  registry: ""
+  repository: redis
+  tag: ""
+  digest: "sha256:8b81dd37ff027bec4e516d41acfbe9fe2460070dc6d4a4570a2ac5b9d59df065"   # redis:7-alpine (multi-arch index)
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+replicaCount: 1
+revisionHistoryLimit: 3
+minReadySeconds: 5
+progressDeadlineSeconds: 300
+podManagementPolicy: OrderedReady
+updateStrategy:
+  type: RollingUpdate
+terminationGracePeriodSeconds: 30
+preStopSleepSeconds: 0   # lets endpoints drain before SIGTERM
+
+serviceAccount:
+  create: true
+  name: ""
+  automount: false   # no API token in the pod
+  annotations: {}
+
+containerPorts:
+  - name: redis
+    containerPort: 6379
+    protocol: TCP
+
+service:
+  type: ClusterIP
+  annotations: {}
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+
+# Telemetry: OTLP/gRPC for traces+metrics+logs, Pyroscope push for profiles - both go to Alloy.
+telemetry:
+  k8sResourceAttributes: false   # adds k8s.pod.name / namespace / node via OTEL_RESOURCE_ATTRIBUTES
+
+# Plain environment. String values go through `tpl`, so {{ .Values... }} and $(VAR) work.
+env: {}
+
+secretEnv: []
+extraEnv: []
+envFrom: []
+# Redis is a cache-style store for carts: AOF persistence on, bounded memory, no eviction (writes fail instead of dropping carts).
+args:
+  - redis-server
+  - --appendonly
+  - "yes"
+  - --save
+  - "60 1"
+  - --maxmemory
+  - 96mb
+  - --maxmemory-policy
+  - noeviction
+
+initContainers: []
+
+startupProbe:
+  exec:
+    command:
+      - "redis-cli"
+      - "ping"
+  periodSeconds: 2
+  timeoutSeconds: 3
+  failureThreshold: 30
+readinessProbe:
+  exec:
+    command:
+      - "redis-cli"
+      - "ping"
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+livenessProbe:
+  exec:
+    command:
+      - "redis-cli"
+      - "ping"
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: "500m"
+    memory: 128Mi
+
+# Pod/container hardening (restricted Pod Security Standard).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 999
+  runAsGroup: 1000
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# Writable scratch space for a read-only root filesystem.
+tmpVolume:
+  enabled: false
+  mountPath: /tmp
+  sizeLimit: 64Mi
+volumes: []
+volumeMounts: []
+
+persistence:
+  enabled: true
+  mountPath: /data
+  size: 1Gi
+  storageClassName: ""   # "" = cluster default, "-" = no class
+  accessModes: ["ReadWriteOnce"]
+  retentionPolicy:        # keep the data when the release is uninstalled or scaled down
+    whenDeleted: Retain
+    whenScaled: Retain
+
+autoscaling:
+  enabled: false
+
+# Single-replica stateful workload: a PDB would block node drains without adding availability.
+podDisruptionBudget:
+  enabled: false
+  maxUnavailable: 1
+
+topologySpread:
+  enabled: false
+  constraints: []
+
+# Zero-trust networking: only the listed callers may connect, only the listed dependencies may be reached.
+networkPolicy:
+  enabled: true
+  ingress:
+    from: [cart-service]          # service names in this namespace
+    fromNamespaces: []
+    fromCIDRs: []
+    extra: []
+  egress:
+    enabled: true
+    dns: true
+    monitoring: false
+    monitoringPorts: []   # Alloy: OTLP/gRPC
+    to: []
+    extra: []
+
+ingress:
+  enabled: false
+
+podAnnotations: {}
+podLabels: {}
+annotations: {}
+commonLabels: {}
+priorityClassName: ""
+nodeSelector: {}
+tolerations: []
+affinity: {}

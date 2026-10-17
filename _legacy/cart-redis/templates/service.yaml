@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cart-redis
+  namespace: {{ .Values.namespace }}
+spec:
+  clusterIP: None
+  selector:
+    app: cart-redis
+  ports:
+    - name: redis
+      port: {{ .Values.port }}
+      targetPort: {{ .Values.port }}

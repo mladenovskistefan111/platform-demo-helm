@@ -1,0 +1,51 @@
+# Production-style overrides (example). Combine with the base values:
+#   helm upgrade --install platform-demo . -n platform-demo -f values-prod.yaml
+global:
+  imageRegistry: ""        # e.g. registry.example.com/mirror
+
+product-catalog-db:
+  auth:
+    existingSecret: product-catalog-db-credentials   # created by External Secrets / SealedSecrets
+  persistence:
+    size: 20Gi
+    storageClassName: ""   # your fast StorageClass
+
+frontend:
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/proxy-body-size: 1m
+    hosts:
+      - host: shop.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: shop-tls
+        hosts: [shop.example.com]
+  autoscaling: { minReplicas: 3, maxReplicas: 10 }
+  topologySpread:
+    enabled: true
+    constraints:
+      - { maxSkew: 1, topologyKey: topology.kubernetes.io/zone, whenUnsatisfiable: ScheduleAnyway }
+      - { maxSkew: 1, topologyKey: kubernetes.io/hostname,       whenUnsatisfiable: DoNotSchedule }
+
+# Hard anti-affinity per node for the stateless services (needs >= 2 schedulable nodes).
+# The default is a soft spread so the chart also works on a single-node cluster.
+x-spread: &spread
+  topologySpread:
+    enabled: true
+    constraints:
+      - { maxSkew: 1, topologyKey: topology.kubernetes.io/zone, whenUnsatisfiable: ScheduleAnyway }
+      - { maxSkew: 1, topologyKey: kubernetes.io/hostname,       whenUnsatisfiable: DoNotSchedule }
+ad-service:              { <<: *spread }
+cart-service:            { <<: *spread }
+checkout-service:        { <<: *spread }
+currency-service:        { <<: *spread }
+email-service:           { <<: *spread }
+payment-service:         { <<: *spread }
+product-catalog-service: { <<: *spread }
+recommendation-service:  { <<: *spread }
+shipping-service:        { <<: *spread }

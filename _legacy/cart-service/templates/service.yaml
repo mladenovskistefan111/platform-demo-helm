@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cart-service
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: cart-service
+  ports:
+    - name: grpc
+      port: {{ .Values.grpcPort }}
+      targetPort: {{ .Values.grpcPort }}
+    - name: metrics
+      port: {{ .Values.metricsPort }}
+      targetPort: {{ .Values.metricsPort }}

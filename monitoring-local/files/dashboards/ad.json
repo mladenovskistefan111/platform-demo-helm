@@ -1,0 +1,231 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "annotations": { "list": [] },
+  "description": "Ad Service — Metrics, Logs, Traces, Profiles (Java / OpenTelemetry + Pyroscope)",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "type": "row",
+      "id": 1,
+      "title": "RED Metrics (Rate / Errors / Duration)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "id": 50,
+      "title": "Total Request Rate",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 50 }, { "color": "red", "value": 100 }] },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [{ "expr": "sum(rate(rpc_server_duration_seconds_count{job=\"ad-service\"}[1m]))", "refId": "A" }]
+    },
+    {
+      "type": "stat",
+      "id": 51,
+      "title": "Error Rate",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 }] },
+          "unit": "percent", "min": 0, "max": 100
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [{ "expr": "100 * sum(rate(rpc_server_duration_seconds_count{job=\"ad-service\", rpc_grpc_status_code!=\"0\"}[1m])) / sum(rate(rpc_server_duration_seconds_count{job=\"ad-service\"}[1m]))", "refId": "A" }]
+    },
+    {
+      "type": "stat",
+      "id": 52,
+      "title": "p99 Latency (GetAds)",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.1 }, { "color": "red", "value": 0.5 }] },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(rpc_server_duration_seconds_bucket{job=\"ad-service\", rpc_method=\"GetAds\"}[1m])) by (le))", "refId": "A" }]
+    },
+    {
+      "type": "row",
+      "id": 100,
+      "title": "Method Breakdown — GetAds",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "id": 101,
+      "title": "GetAds — Total Calls",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }] }, "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [{ "expr": "sum(rpc_server_duration_seconds_count{job=\"ad-service\", rpc_method=\"GetAds\"})", "refId": "A" }]
+    },
+    {
+      "type": "stat",
+      "id": 102,
+      "title": "GetAds — Rate (req/s)",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }] }, "unit": "reqps" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [{ "expr": "sum(rate(rpc_server_duration_seconds_count{job=\"ad-service\", rpc_method=\"GetAds\"}[1m]))", "refId": "A" }]
+    },
+    {
+      "type": "stat",
+      "id": 103,
+      "title": "GetAds — Active Requests",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 10 }, { "color": "red", "value": 50 }] }, "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [{ "expr": "sum(rpc_server_active_requests{job=\"ad-service\", rpc_method=\"GetAds\"})", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "id": 107,
+      "title": "Request Rate (req/s)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2, "fillOpacity": 10 }, "unit": "reqps" }, "overrides": [] },
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] } },
+      "targets": [{ "expr": "sum(rate(rpc_server_duration_seconds_count{job=\"ad-service\"}[1m])) by (rpc_method)", "legendFormat": "{{rpc_method}}", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "id": 108,
+      "title": "Latency p50 / p95 / p99",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2, "fillOpacity": 10 }, "unit": "s" }, "overrides": [] },
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(rpc_server_duration_seconds_bucket{job=\"ad-service\"}[1m])) by (le))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum(rate(rpc_server_duration_seconds_bucket{job=\"ad-service\"}[1m])) by (le))", "legendFormat": "p95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, sum(rate(rpc_server_duration_seconds_bucket{job=\"ad-service\"}[1m])) by (le))", "legendFormat": "p99", "refId": "C" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 110,
+      "title": "gRPC Status Codes",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2, "fillOpacity": 15, "stacking": { "mode": "normal" } }, "unit": "reqps" }, "overrides": [] },
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] } },
+      "targets": [{ "expr": "sum(rate(rpc_server_duration_seconds_count{job=\"ad-service\"}[1m])) by (rpc_grpc_status_code) > 0", "legendFormat": "code={{rpc_grpc_status_code}}", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "id": 111,
+      "title": "Error Rate Over Time (%)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "red" }, "custom": { "lineWidth": 2, "fillOpacity": 10 }, "unit": "percent", "min": 0, "max": 100 }, "overrides": [] },
+      "options": { "tooltip": { "mode": "single" }, "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [{ "expr": "100 * sum(rate(rpc_server_duration_seconds_count{job=\"ad-service\", rpc_grpc_status_code!=\"0\"}[1m])) / sum(rate(rpc_server_duration_seconds_count{job=\"ad-service\"}[1m]))", "legendFormat": "error %", "refId": "A" }]
+    },
+    {
+      "type": "row",
+      "id": 10,
+      "title": "Logs",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "collapsed": false
+    },
+    {
+      "type": "logs",
+      "id": 11,
+      "title": "Live Logs — ad-service",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 27 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showTime": true, "showLabels": false, "sortOrder": "Descending", "wrapLogMessage": false },
+      "targets": [{ "expr": "{service_name=\"ad-service\"}", "legendFormat": "", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "id": 12,
+      "title": "Log Volume by Level",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 37 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2, "fillOpacity": 20, "stacking": { "mode": "normal" } }, "unit": "short" },
+        "overrides": [
+          { "matcher": { "id": "byRegexp", "options": "(?i)error|err" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] },
+          { "matcher": { "id": "byRegexp", "options": "(?i)warn" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } }] }
+        ]
+      },
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [{ "expr": "sum by (detected_level) (count_over_time({service_name=\"ad-service\"} | detected_level != \"\" [1m]))", "legendFormat": "{{detected_level}}", "refId": "A" }]
+    },
+    {
+      "type": "row",
+      "id": 20,
+      "title": "Traces",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 43 },
+      "collapsed": false
+    },
+    {
+      "type": "table",
+      "id": 21,
+      "title": "Recent Traces — ad-service",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 44 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "targets": [{ "datasource": { "type": "tempo", "uid": "tempo" }, "query": "{resource.service.name = \"ad-service\"}", "queryType": "traceql", "limit": 20, "refId": "A", "tableType": "traces" }]
+    },
+    {
+      "type": "row",
+      "id": 30,
+      "title": "Profiles",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 54 },
+      "collapsed": false
+    },
+    {
+      "type": "flamegraph",
+      "id": 31,
+      "title": "CPU Flame Graph — ad-service",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 55 },
+      "datasource": { "type": "grafana-pyroscope-datasource", "uid": "pyroscope" },
+      "targets": [{ "datasource": { "type": "grafana-pyroscope-datasource", "uid": "pyroscope" }, "groupBy": [], "labelSelector": "{service_name=\"ad-service\"}", "profileTypeId": "process_cpu:cpu:nanoseconds:cpu:nanoseconds", "queryType": "profile", "refId": "A" }]
+    },
+    {
+      "type": "flamegraph",
+      "id": 32,
+      "title": "Heap Allocation Flame Graph — ad-service",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 67 },
+      "datasource": { "type": "grafana-pyroscope-datasource", "uid": "pyroscope" },
+      "targets": [{ "datasource": { "type": "grafana-pyroscope-datasource", "uid": "pyroscope" }, "groupBy": [], "labelSelector": "{service_name=\"ad-service\"}", "profileTypeId": "inuse_space:inuse_space:bytes:space:bytes", "queryType": "profile", "refId": "A" }]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["ad", "grpc", "java", "observability"],
+  "title": "Ad Service",
+  "uid": "ad-service-overview",
+  "time": { "from": "now-30m", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "version": 1
+}

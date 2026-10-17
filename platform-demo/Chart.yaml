@@ -1,0 +1,26 @@
+apiVersion: v2
+name: platform-demo
+description: >-
+  Umbrella chart for the whole platform-demo application: frontend, nine backend services,
+  PostgreSQL and Redis. The observability stack (Alloy, Mimir, Loki, Tempo, Pyroscope, Grafana)
+  is installed separately (see ../monitoring).
+type: application
+version: 0.2.0
+appVersion: "1.1.0"
+kubeVersion: ">=1.27.0-0"
+keywords: [platform-demo, e-commerce, microservices]
+maintainers:
+  - name: mladenovskistefan111
+dependencies:
+  - { name: product-catalog-db,      version: 0.2.0, repository: "file://../product-catalog-db",      condition: product-catalog-db.enabled }
+  - { name: cart-redis,              version: 0.2.0, repository: "file://../cart-redis",              condition: cart-redis.enabled }
+  - { name: ad-service,              version: 0.2.0, repository: "file://../ad-service",              condition: ad-service.enabled }
+  - { name: currency-service,        version: 0.2.0, repository: "file://../currency-service",        condition: currency-service.enabled }
+  - { name: shipping-service,        version: 0.2.0, repository: "file://../shipping-service",        condition: shipping-service.enabled }
+  - { name: payment-service,         version: 0.2.0, repository: "file://../payment-service",         condition: payment-service.enabled }
+  - { name: email-service,           version: 0.2.0, repository: "file://../email-service",           condition: email-service.enabled }
+  - { name: product-catalog-service, version: 0.2.0, repository: "file://../product-catalog-service", condition: product-catalog-service.enabled }
+  - { name: cart-service,            version: 0.2.0, repository: "file://../cart-service",            condition: cart-service.enabled }
+  - { name: recommendation-service,  version: 0.2.0, repository: "file://../recommendation-service",  condition: recommendation-service.enabled }
+  - { name: checkout-service,        version: 0.2.0, repository: "file://../checkout-service",        condition: checkout-service.enabled }
+  - { name: frontend,                version: 0.2.0, repository: "file://../frontend",                condition: frontend.enabled }

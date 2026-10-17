@@ -1,0 +1,24 @@
+# Hostnames are built from `domain`:  shop.<domain>  and  grafana.<domain>
+domain: platform-demo.test
+
+gatewayClassName: platform-envoy
+controllerName: gateway.envoyproxy.io/gatewayclass-controller
+
+gateway:
+  name: platform-gateway
+  namespace: gateway-system
+  tlsSecretName: platform-tls        # kubernetes.io/tls Secret in gateway.namespace covering *.<domain>
+
+# Envoy Gateway creates one proxy Service per Gateway. On kind there is no LoadBalancer, so it is a NodePort
+# with fixed ports that kind/cluster.yaml maps to the host (127.0.0.1:80 / :443).
+envoyProxy:
+  namespace: envoy-gateway-system
+  service:
+    type: NodePort
+    httpNodePort: 30080
+    httpsNodePort: 30443
+  replicas: 1
+
+routes:
+  shop:    { namespace: platform-demo, service: frontend, port: 80,   host: shop }
+  grafana: { namespace: monitoring,    service: grafana,  port: 3000, host: grafana }

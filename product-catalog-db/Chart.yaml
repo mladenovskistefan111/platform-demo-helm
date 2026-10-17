@@ -1,12 +1,14 @@
 apiVersion: v2
 name: product-catalog-db
-description: PostgreSQL database for the product catalog service
+description: PostgreSQL 17 with the product catalog schema and seed data
 type: application
-version: 0.1.0
-appVersion: "latest"
-keywords:
-  - postgresql
-  - database
-  - product-catalog
+version: 0.2.0
+appVersion: "17"
+kubeVersion: ">=1.27.0-0"
+keywords: [platform-demo, database]
 maintainers:
-  - name: mladenovskistefan
+  - name: mladenovskistefan111
+dependencies:
+  - name: platform-common
+    version: 0.1.0
+    repository: file://../platform-common

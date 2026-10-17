@@ -1,0 +1,12 @@
+platform-demo {{ .Chart.AppVersion }} installed in namespace "{{ .Release.Namespace }}".
+
+  kubectl -n {{ .Release.Namespace }} get deploy,sts,hpa,pdb,netpol
+  kubectl -n {{ .Release.Namespace }} port-forward svc/frontend 8080:80   # then open http://localhost:8080
+{{- if not (index .Values "product-catalog-db" "auth" "password") }}
+{{- if not (index .Values "product-catalog-db" "auth" "existingSecret") }}
+
+WARNING: product-catalog-db has no credentials (auth.password / auth.existingSecret).
+{{- end }}
+{{- end }}
+
+Telemetry goes to {{ .Values.global.monitoring.otlpEndpoint }} (OTLP/gRPC) and {{ .Values.global.monitoring.pyroscopeAddr }} (profiles).

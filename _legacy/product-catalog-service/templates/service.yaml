@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-catalog-service
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: product-catalog-service
+  ports:
+    - name: grpc
+      port: {{ .Values.grpcPort }}
+      targetPort: {{ .Values.grpcPort }}
+    - name: metrics
+      port: {{ .Values.metricsPort }}
+      targetPort: {{ .Values.metricsPort }}

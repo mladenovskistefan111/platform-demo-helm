@@ -1,0 +1,19 @@
+namespace: checkout
+
+monitoring:
+  collectorAddr: alloy.monitoring.svc.cluster.local:4317
+  pyroscopeAddr: http://pyroscope.monitoring.svc.cluster.local:4040
+
+service:
+  image: mladenovskistefan/checkout-service@sha256:5c9f6d53be3cb6d0a3f94a73efed14702155974da136fe8a13fa2daa93b009ed
+  grpcPort: 5050
+  metricsPort: 9090
+  replicas: 1
+
+dependencies:
+  productCatalogAddr: product-catalog-service.product-catalog-service.svc.cluster.local:3550
+  cartAddr: cart-service.cart-service.svc.cluster.local:7070
+  currencyAddr: currency-service.currency.svc.cluster.local:7000
+  shippingAddr: shipping-service.shipping.svc.cluster.local:50051
+  paymentAddr: payment-service.payment.svc.cluster.local:50051
+  emailAddr: email-service.email.svc.cluster.local:8080

@@ -1,0 +1,187 @@
+# ad-service - Ad Service - contextual ads over gRPC (Java 21)
+# Defaults are production-leaning (HA, hardened, NetworkPolicy on). See ../platform-demo/values-dev.yaml for a lightweight profile.
+
+nameOverride: ""
+fullnameOverride: ""
+component: backend
+
+# Shared with the umbrella chart (parent values override these).
+global:
+  imageRegistry: ""            # e.g. registry.example.com/mirror - prefixes every image
+  monitoring:
+    namespace: monitoring      # namespace of the observability stack (NetworkPolicy egress)
+    otlpEndpoint: http://alloy.monitoring.svc.cluster.local:4317   # OTLP/gRPC: traces, metrics, logs
+    pyroscopeAddr: http://alloy.monitoring.svc.cluster.local:4040  # profiles (Pyroscope push protocol, via Alloy)
+
+image:
+  registry: ""
+  repository: mladenovskistefan/ad-service
+  tag: ""                       # defaults to Chart.appVersion (build/push this tag, or set digest)
+  digest: "sha256:2b51a31ce86f36662096b93a231024588a14e2e974f245dbb6772622333cfb29"                  # mladenovskistefan/ad-service:latest, OTLP build (2026-10)
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+replicaCount: 2
+revisionHistoryLimit: 3
+minReadySeconds: 5
+progressDeadlineSeconds: 300
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 25%
+    maxUnavailable: 0   # never drop capacity during a rollout
+terminationGracePeriodSeconds: 20
+preStopSleepSeconds: 5   # lets endpoints drain before SIGTERM
+
+serviceAccount:
+  create: true
+  name: ""
+  automount: false   # no API token in the pod
+  annotations: {}
+
+containerPorts:
+  - name: grpc
+    containerPort: 9555
+    protocol: TCP
+
+service:
+  type: ClusterIP
+  annotations: {}
+  ports:
+    - name: grpc
+      port: 9555
+      targetPort: grpc
+      appProtocol: grpc
+
+# Telemetry: OTLP/gRPC for traces+metrics+logs, Pyroscope push for profiles - both go to Alloy.
+telemetry:
+  k8sResourceAttributes: true   # adds k8s.pod.name / namespace / node via OTEL_RESOURCE_ATTRIBUTES
+
+# Plain environment. String values go through `tpl`, so {{ .Values... }} and $(VAR) work.
+env:
+  OTEL_SERVICE_NAME: "ad-service"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "{{ .Values.global.monitoring.otlpEndpoint }}"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+  SERVICE_VERSION: "{{ .Chart.AppVersion }}"
+  PORT: "9555"
+  PYROSCOPE_ADDR: "{{ .Values.global.monitoring.pyroscopeAddr }}"
+  JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=60 -XX:+ExitOnOutOfMemoryError"
+
+secretEnv: []
+extraEnv: []
+envFrom: []
+
+initContainers: []
+
+startupProbe:
+  grpc:
+    port: 9555
+  periodSeconds: 3
+  failureThreshold: 30
+readinessProbe:
+  grpc:
+    port: 9555
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+livenessProbe:
+  grpc:
+    port: 9555
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 192Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+# Pod/container hardening (restricted Pod Security Standard).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 100
+  runAsGroup: 101
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# Writable scratch space for a read-only root filesystem.
+tmpVolume:
+  enabled: true
+  mountPath: /tmp
+  sizeLimit: 64Mi
+volumes: []
+volumeMounts: []
+
+# Horizontal Pod Autoscaler (needs metrics-server). Target is a % of the CPU *request*.
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: null
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+
+# Keeps at least one pod serving during voluntary disruptions (node drains, upgrades).
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+  # minAvailable: 1
+
+# Spread replicas over zones and nodes (soft: never blocks scheduling on small clusters).
+topologySpread:
+  enabled: true
+  constraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+
+# Zero-trust networking: only the listed callers may connect, only the listed dependencies may be reached.
+networkPolicy:
+  enabled: true
+  ingress:
+    from: [frontend]          # service names in this namespace
+    fromNamespaces: []
+    fromCIDRs: []
+    extra: []
+  egress:
+    enabled: true
+    dns: true
+    monitoring: true
+    monitoringPorts: [4317, 4040]   # Alloy: OTLP/gRPC, Pyroscope
+    to: []
+    extra: []
+
+ingress:
+  enabled: false
+
+podAnnotations: {}
+podLabels: {}
+annotations: {}
+commonLabels: {}
+priorityClassName: ""
+nodeSelector: {}
+tolerations: []
+affinity: {}

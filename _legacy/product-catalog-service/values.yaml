@@ -1,0 +1,17 @@
+namespace: product-catalog-service
+
+image: mladenovskistefan/product-catalog-service@sha256:0678cae7afa33ccc85edc9a79ad9bcbea27005d93963ccc5f6a5ef30a7c73bbb
+grpcPort: 3550
+metricsPort: 9090
+replicas: 1
+
+db:
+  host: product-catalog-db.product-catalog-db.svc.cluster.local
+  port: 5432
+  database: productcatalog
+  user: catalog
+  password: catalog
+
+monitoring:
+  collectorAddr: alloy.monitoring.svc.cluster.local:4317
+  pyroscopeAddr: http://pyroscope.monitoring.svc.cluster.local:4040

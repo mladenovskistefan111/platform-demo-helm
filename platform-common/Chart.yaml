@@ -1,0 +1,8 @@
+apiVersion: v2
+name: platform-common
+description: >-
+  Shared Helm templates (library chart) for the platform-demo services: Deployment/StatefulSet,
+  Service, HPA, PodDisruptionBudget, NetworkPolicy, ServiceAccount and Ingress with hardened defaults.
+type: library
+version: 0.1.0
+kubeVersion: ">=1.27.0-0"

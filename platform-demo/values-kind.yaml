@@ -1,0 +1,6 @@
+# Layer on top of values-dev.yaml for the local kind cluster fronted by Envoy Gateway:
+#   helm upgrade --install platform-demo . -n platform-demo -f values-dev.yaml -f values-kind.yaml
+frontend:
+  networkPolicy:
+    ingress:
+      fromNamespaces: [envoy-gateway-system]   # the Envoy proxy pods created for the Gateway

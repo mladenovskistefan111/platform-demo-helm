@@ -1,84 +1,196 @@
-# ── Global ────────────────────────────────────────────────────────────────────
+# product-catalog-db - PostgreSQL 17 with the product catalog schema and seed data
+# Defaults are production-leaning (HA, hardened, NetworkPolicy on). See ../platform-demo/values-dev.yaml for a lightweight profile.
+
 nameOverride: ""
 fullnameOverride: ""
+component: database
 
-# ── Image ─────────────────────────────────────────────────────────────────────
+# Shared with the umbrella chart (parent values override these).
+global:
+  imageRegistry: ""            # e.g. registry.example.com/mirror - prefixes every image
+  monitoring:
+    namespace: monitoring      # namespace of the observability stack (NetworkPolicy egress)
+    otlpEndpoint: http://alloy.monitoring.svc.cluster.local:4317   # OTLP/gRPC: traces, metrics, logs
+    pyroscopeAddr: http://alloy.monitoring.svc.cluster.local:4040  # profiles (Pyroscope push protocol, via Alloy)
+
 image:
+  registry: ""
   repository: mladenovskistefan/product-catalog-db
-  tag: latest
-  pullPolicy: IfNotPresent   # change to Never when using a locally loaded image
+  tag: ""                       # defaults to Chart.appVersion
+  digest: "sha256:c1edd3a805e892df3edee101c046f8a7e45ab38ab670e981cb1a91a4ce3b355b"   # pinned; clear to use the tag
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
 
-# ── Namespace ─────────────────────────────────────────────────────────────────
-# The chart is installed into whatever namespace `helm install -n <ns>` targets.
-# Set createNamespace: true in your install command or pre-create it.
+replicaCount: 1
+revisionHistoryLimit: 3
+minReadySeconds: 5
+progressDeadlineSeconds: 300
+podManagementPolicy: OrderedReady
+updateStrategy:
+  type: RollingUpdate
+terminationGracePeriodSeconds: 60
+preStopSleepSeconds: 0   # lets endpoints drain before SIGTERM
 
-# ── Credentials (sourced from an externally-managed Secret) ───────────────────
-# The chart does NOT create the Secret so that credentials are never stored in
-# values files or version control.  Create it once with:
-#
-#   kubectl create secret generic postgres-credentials \
-#     --namespace product-catalog-db \
-#     --from-literal=POSTGRES_USER=catalog_user \
-#     --from-literal=POSTGRES_PASSWORD=<password> \
-#     --from-literal=POSTGRES_DB=product_catalog
-#
-existingSecret: postgres-credentials
+serviceAccount:
+  create: true
+  name: ""
+  automount: false   # no API token in the pod
+  annotations: {}
 
-# ── PostgreSQL ─────────────────────────────────────────────────────────────────
-postgres:
-  port: 5432
-  user: catalog_user       # used by the readinessProbe only
-  database: product_catalog # used by the readinessProbe only
+containerPorts:
+  - name: postgres
+    containerPort: 5432
+    protocol: TCP
 
-# ── Storage ───────────────────────────────────────────────────────────────────
-persistence:
-  enabled: true
-  storageClassName: ""     # leave empty to use the cluster default StorageClass
-  accessMode: ReadWriteOnce
-  size: 1Gi
+service:
+  type: ClusterIP
+  annotations: {}
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
 
-# ── Resources ─────────────────────────────────────────────────────────────────
+# Telemetry: OTLP/gRPC for traces+metrics+logs, Pyroscope push for profiles - both go to Alloy.
+telemetry:
+  k8sResourceAttributes: false   # adds k8s.pod.name / namespace / node via OTEL_RESOURCE_ATTRIBUTES
+
+# Plain environment. String values go through `tpl`, so {{ .Values... }} and $(VAR) work.
+env:
+  PGDATA: "/var/lib/postgresql/data/pgdata"
+
+# Credentials come from a Secret. Use auth.existingSecret (recommended: SealedSecrets / External Secrets),
+# or set auth.password and the chart creates the Secret for you.
+auth:
+  existingSecret: ""           # Secret with keys POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
+  secretName: product-catalog-db-credentials   # name of the Secret created when existingSecret is empty
+  database: productcatalog
+  username: catalog
+  password: ""                 # required when existingSecret is empty (alphanumeric: it is embedded in a URL)
+
+secretEnv:
+  - name: POSTGRES_DB
+    secretName: "{{ .Values.auth.existingSecret | default .Values.auth.secretName }}"
+    key: POSTGRES_DB
+  - name: POSTGRES_USER
+    secretName: "{{ .Values.auth.existingSecret | default .Values.auth.secretName }}"
+    key: POSTGRES_USER
+  - name: POSTGRES_PASSWORD
+    secretName: "{{ .Values.auth.existingSecret | default .Values.auth.secretName }}"
+    key: POSTGRES_PASSWORD
+extraEnv: []
+envFrom: []
+
+initContainers: []
+
+startupProbe:
+  exec:
+    command:
+      - "sh"
+      - "-c"
+      - "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""
+  periodSeconds: 3
+  timeoutSeconds: 5
+  failureThreshold: 40
+readinessProbe:
+  exec:
+    command:
+      - "sh"
+      - "-c"
+      - "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""
+  periodSeconds: 5
+  timeoutSeconds: 5
+  failureThreshold: 6
+livenessProbe:
+  exec:
+    command:
+      - "sh"
+      - "-c"
+      - "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+
 resources:
   requests:
     cpu: 100m
-    memory: 128Mi
-  limits:
-    cpu: 500m
     memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
 
-# ── Probes ────────────────────────────────────────────────────────────────────
-readinessProbe:
-  initialDelaySeconds: 5
-  periodSeconds: 5
-  timeoutSeconds: 3
-  failureThreshold: 6
+# Pod/container hardening (restricted Pod Security Standard).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 999
+  runAsGroup: 999
+  fsGroup: 999
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
 
-livenessProbe:
-  initialDelaySeconds: 30
-  periodSeconds: 10
-  timeoutSeconds: 5
-  failureThreshold: 3
+# Writable scratch space for a read-only root filesystem.
+tmpVolume:
+  enabled: true
+  mountPath: /tmp
+  sizeLimit: 64Mi
+volumes:
+  - name: pg-run
+    emptyDir: { sizeLimit: 8Mi }
+volumeMounts:
+  - name: pg-run
+    mountPath: /var/run/postgresql
 
-# ── Service ───────────────────────────────────────────────────────────────────
-service:
-  type: ClusterIP
-  port: 5432
+persistence:
+  enabled: true
+  mountPath: /var/lib/postgresql/data
+  size: 2Gi
+  storageClassName: ""   # "" = cluster default, "-" = no class
+  accessModes: ["ReadWriteOnce"]
+  retentionPolicy:        # keep the data when the release is uninstalled or scaled down
+    whenDeleted: Retain
+    whenScaled: Retain
 
-# ── Network Policy (Cilium) ───────────────────────────────────────────────────
+autoscaling:
+  enabled: false
+
+# Single-replica stateful workload: a PDB would block node drains without adding availability.
+podDisruptionBudget:
+  enabled: false
+  maxUnavailable: 1
+
+topologySpread:
+  enabled: false
+  constraints: []
+
+# Zero-trust networking: only the listed callers may connect, only the listed dependencies may be reached.
 networkPolicy:
   enabled: true
-  # Namespace where the consuming service lives.
-  # The policy selects pods labelled app=product-catalog-service in this namespace.
-  clientNamespace: product-catalog
-  clientPodSelector:
-    app: product-catalog-service
+  ingress:
+    from: [product-catalog-service]          # service names in this namespace
+    fromNamespaces: []
+    fromCIDRs: []
+    extra: []
+  egress:
+    enabled: true
+    dns: true
+    monitoring: false
+    monitoringPorts: []   # Alloy: OTLP/gRPC
+    to: []
+    extra: []
 
-# ── Pod Security ──────────────────────────────────────────────────────────────
-podSecurityContext: {}
-containerSecurityContext: {}
+ingress:
+  enabled: false
 
-# ── Pod disruption, affinity, tolerations ─────────────────────────────────────
 podAnnotations: {}
+podLabels: {}
+annotations: {}
+commonLabels: {}
+priorityClassName: ""
 nodeSelector: {}
 tolerations: []
 affinity: {}

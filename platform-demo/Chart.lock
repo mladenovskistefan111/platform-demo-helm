@@ -1,0 +1,39 @@
+dependencies:
+- name: product-catalog-db
+  repository: file://../product-catalog-db
+  version: 0.2.0
+- name: cart-redis
+  repository: file://../cart-redis
+  version: 0.2.0
+- name: ad-service
+  repository: file://../ad-service
+  version: 0.2.0
+- name: currency-service
+  repository: file://../currency-service
+  version: 0.2.0
+- name: shipping-service
+  repository: file://../shipping-service
+  version: 0.2.0
+- name: payment-service
+  repository: file://../payment-service
+  version: 0.2.0
+- name: email-service
+  repository: file://../email-service
+  version: 0.2.0
+- name: product-catalog-service
+  repository: file://../product-catalog-service
+  version: 0.2.0
+- name: cart-service
+  repository: file://../cart-service
+  version: 0.2.0
+- name: recommendation-service
+  repository: file://../recommendation-service
+  version: 0.2.0
+- name: checkout-service
+  repository: file://../checkout-service
+  version: 0.2.0
+- name: frontend
+  repository: file://../frontend
+  version: 0.2.0
+digest: sha256:091288bfea58aa479a8bbc6401e86b7b6a4f3ed7558cfd5e1529adf25a9b3f67
+generated: "2026-10-16T23:04:26.375232842+02:00"

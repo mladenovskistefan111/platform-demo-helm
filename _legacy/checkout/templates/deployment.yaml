@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout-service
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: checkout-service
+spec:
+  replicas: {{ .Values.service.replicas }}
+  selector:
+    matchLabels:
+      app: checkout-service
+  template:
+    metadata:
+      labels:
+        app: checkout-service
+    spec:
+      containers:
+        - name: checkout-service
+          image: {{ .Values.service.image }}
+          ports:
+            - name: grpc
+              containerPort: {{ .Values.service.grpcPort }}
+            - name: metrics
+              containerPort: {{ .Values.service.metricsPort }}
+          env:
+            - name: ENABLE_TRACING
+              value: "1"
+            - name: COLLECTOR_SERVICE_ADDR
+              value: {{ .Values.monitoring.collectorAddr | quote }}
+            - name: ENABLE_PROFILING
+              value: "1"
+            - name: PYROSCOPE_ADDR
+              value: {{ .Values.monitoring.pyroscopeAddr | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: checkout-service
+            - name: PRODUCT_CATALOG_SERVICE_ADDR
+              value: {{ .Values.dependencies.productCatalogAddr | quote }}
+            - name: CART_SERVICE_ADDR
+              value: {{ .Values.dependencies.cartAddr | quote }}
+            - name: CURRENCY_SERVICE_ADDR
+              value: {{ .Values.dependencies.currencyAddr | quote }}
+            - name: SHIPPING_SERVICE_ADDR
+              value: {{ .Values.dependencies.shippingAddr | quote }}
+            - name: PAYMENT_SERVICE_ADDR
+              value: {{ .Values.dependencies.paymentAddr | quote }}
+            - name: EMAIL_SERVICE_ADDR
+              value: {{ .Values.dependencies.emailAddr | quote }}
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.service.grpcPort }}
+            initialDelaySeconds: 10
+            periodSeconds: 5

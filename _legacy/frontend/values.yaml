@@ -1,0 +1,21 @@
+namespace: frontend
+
+monitoring:
+  collectorAddr: alloy.monitoring.svc.cluster.local:4317
+  pyroscopeAddr: http://pyroscope.monitoring.svc.cluster.local:4040
+
+service:
+  image: mladenovskistefan/frontend@sha256:43e293162b9fa91aee35dd6a941f526c5926103ce349cea84f9988160e819e1b
+  port: 8080
+  metricsPort: 9464
+  replicas: 1
+  type: LoadBalancer
+
+dependencies:
+  productCatalogAddr: product-catalog-service.product-catalog-service.svc.cluster.local:3550
+  currencyAddr: currency-service.currency.svc.cluster.local:7000
+  cartAddr: cart-service.cart-service.svc.cluster.local:7070
+  recommendationAddr: recommendation-service.recommendation.svc.cluster.local:8080
+  checkoutAddr: checkout-service.checkout.svc.cluster.local:5050
+  shippingAddr: shipping-service.shipping.svc.cluster.local:50051
+  adAddr: ad-service.ad.svc.cluster.local:9555

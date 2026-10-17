@@ -1,0 +1,30 @@
+# platform-demo umbrella values.
+# Anything under a sub-chart name (frontend:, checkout-service:, ...) overrides that chart's values.yaml.
+# Profiles:  values-dev.yaml  = small footprint (1 replica, no HPA/PDB/NetworkPolicy)
+#            values-prod.yaml = ingress + TLS + external secrets example
+
+global:
+  imageRegistry: ""                  # prefix for every image (private mirror)
+  monitoring:
+    namespace: monitoring
+    otlpEndpoint: http://alloy.monitoring.svc.cluster.local:4317    # OTLP/gRPC: traces, metrics, logs
+    pyroscopeAddr: http://alloy.monitoring.svc.cluster.local:4040   # profiles via Alloy
+
+# Toggle individual components (e.g. when a database is managed outside the cluster).
+frontend:                { enabled: true }
+ad-service:              { enabled: true }
+cart-service:            { enabled: true }
+checkout-service:        { enabled: true }
+currency-service:        { enabled: true }
+email-service:           { enabled: true }
+payment-service:         { enabled: true }
+product-catalog-service: { enabled: true }
+recommendation-service:  { enabled: true }
+shipping-service:        { enabled: true }
+cart-redis:              { enabled: true }
+
+product-catalog-db:
+  enabled: true
+  auth:
+    existingSecret: ""     # recommended: pre-create a Secret with POSTGRES_DB / POSTGRES_USER / POSTGRES_PASSWORD
+    password: ""           # otherwise set this (alphanumeric) - the install fails if both are empty

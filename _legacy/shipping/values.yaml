@@ -1,0 +1,11 @@
+namespace: shipping
+
+monitoring:
+  collectorAddr: alloy.monitoring.svc.cluster.local:4317
+  pyroscopeAddr: http://pyroscope.monitoring.svc.cluster.local:4040
+
+service:
+  image: mladenovskistefan/shipping-service@sha256:1c77e485f1562f046bb94036fb53984d29c8afabd148e59de516bb55652fc37c
+  grpcPort: 50051
+  metricsPort: 9090
+  replicas: 1

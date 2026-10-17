@@ -1,14 +1,18 @@
 version: 2
+multi-ecosystem-groups:
+  dependencies:
+    schedule:
+      interval: monthly
 updates:
   - package-ecosystem: github-actions
     directory: /
-    schedule:
-      interval: weekly
+    multi-ecosystem-group: dependencies
+    patterns: ["*"]
     cooldown:
       default-days: 7 # let a new release settle before it is proposed
-    open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
-    groups:
-      minor-and-patch:
-        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"

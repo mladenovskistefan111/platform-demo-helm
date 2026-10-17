@@ -25,7 +25,7 @@ spec:
   project: platform-admin
   source:
     repoURL: https://github.com/mladenovskistefan111/platform-demo-helm.git
-    targetRevision: main
+    targetRevision: feat/kyverno
     path: gitops/apps
   destination: { name: in-cluster, namespace: argocd }
   syncPolicy:

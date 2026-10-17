@@ -1,0 +1,47 @@
+# Kyverno 1.19 (chart kyverno/kyverno 3.9.1). Used by gitops/apps/application-kyverno.yaml.
+# Laptop profile: one replica of each controller, small requests. For AWS: 3 admission replicas + PDBs (HA).
+
+# Only the admission, background and reports controllers are needed. Cleanup policies are not used yet.
+cleanupController:
+  enabled: false
+
+admissionController:
+  replicas: 1
+  container:
+    resources:
+      requests: { cpu: 50m, memory: 96Mi }
+      limits: { memory: 384Mi }
+  initContainer:
+    resources:
+      requests: { cpu: 10m, memory: 32Mi }
+      limits: { memory: 128Mi }
+backgroundController:
+  replicas: 1
+  resources:
+    requests: { cpu: 25m, memory: 64Mi }
+    limits: { memory: 256Mi }
+reportsController:
+  replicas: 1
+  resources:
+    requests: { cpu: 25m, memory: 64Mi }
+    limits: { memory: 256Mi }
+
+features:
+  # PolicyExceptions are honoured only when created in the kyverno namespace (i.e. by whoever administers Kyverno),
+  # never from the workload namespaces they would exempt.
+  policyExceptions:
+    enabled: true
+    namespace: kyverno
+  # Kyverno writes success events for every request otherwise; keep the event stream quiet.
+  omitEvents:
+    eventTypes: [PolicyApplied, PolicySkipped]
+
+config:
+  # Namespaces whose objects never reach Kyverno. These run the CNI and SPIRE: a Kyverno outage must not stop them
+  # (webhook deadlock), and they are not ours to police. argocd and monitoring ARE policed.
+  webhooks:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [kube-system, kube-public, kube-node-lease, cilium-spire, cilium-secrets, local-path-storage, kyverno]

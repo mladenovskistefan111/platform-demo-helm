@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Namespace
+metadata: { name: platform-demo, labels: { kubernetes.io/metadata.name: platform-demo } }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: bare, namespace: platform-demo, labels: { app.kubernetes.io/name: frontend } }
+spec: { containers: [{ name: c, image: i }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: token-and-seccomp-already-set, namespace: platform-demo, labels: { app.kubernetes.io/name: frontend } }
+spec:
+  automountServiceAccountToken: true
+  securityContext: { seccompProfile: { type: Localhost, localhostProfile: custom.json } }
+  containers: [{ name: c, image: i }]

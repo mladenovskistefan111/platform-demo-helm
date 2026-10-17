@@ -1,0 +1,13 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata: { name: mutation }
+policies: [../../.rendered/mutation.yaml]
+resources: [resources.yaml]
+results:
+  # a bare pod gets: no API token, RuntimeDefault seccomp, the portal label (patched.yaml is the result of all four policies)
+  - { policy: pd-default-no-api-token, isMutatingPolicy: true, kind: Pod, resources: [bare], patchedResources: patched.yaml, result: pass }
+  - { policy: pd-default-seccomp-workload, isMutatingPolicy: true, kind: Pod, resources: [bare], patchedResources: patched.yaml, result: pass }
+  - { policy: pd-backstage-kubernetes-id, isMutatingPolicy: true, kind: Pod, resources: [bare], patchedResources: patched.yaml, result: pass }
+  # what a pod sets itself is never overwritten (only the portal label is added)
+  - { policy: pd-default-no-api-token, isMutatingPolicy: true, kind: Pod, resources: [token-and-seccomp-already-set], patchedResources: patched-keep.yaml, result: skip }
+  - { policy: pd-default-seccomp-workload, isMutatingPolicy: true, kind: Pod, resources: [token-and-seccomp-already-set], patchedResources: patched-keep.yaml, result: skip }

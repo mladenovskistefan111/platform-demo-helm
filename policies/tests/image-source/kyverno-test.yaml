@@ -1,0 +1,10 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata: { name: image-source }
+policies: [../../.rendered/images.yaml]
+resources: [resources.yaml]
+results:
+  - { policy: pd-image-source, isValidatingPolicy: true, kind: Pod, resources: [ours-digest, redis-digest, busybox-tag-and-digest], result: pass }
+  - { policy: pd-image-source, isValidatingPolicy: true, kind: Pod, resources: [foreign-registry, other-dockerhub-repo, tag-only, latest, untagged], result: fail }
+  - { policy: pd-image-source-platform, isValidatingPolicy: true, kind: Pod, resources: [grafana-digest, argocd-tag-ok], result: pass }
+  - { policy: pd-image-source-platform, isValidatingPolicy: true, kind: Pod, resources: [grafana-tag-only], result: fail }

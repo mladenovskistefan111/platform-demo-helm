@@ -17,6 +17,8 @@ env:
   KUBECONFORM_VERSION: v0.8.0
   KUBECONFORM_SHA256: 9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
   COSIGN_VERSION: v3.1.3
+  KYVERNO_VERSION: v1.19.1
+  KYVERNO_SHA256: b38228f367fc0fdc2b08f4c83ea50ac5f16c60ff8d62d76a66157c33c47b70ae
   KUBERNETES_VERSION: 1.33.0
 
 jobs:
@@ -200,6 +202,48 @@ jobs:
             fi
           done
           exit $status
+
+  # ─── admission policies ───────────────────────────────────────────────────
+
+  kyverno-policies:
+    name: Kyverno policy tests
+    runs-on: ubuntu-latest
+    needs: [lint-and-render]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install the Kyverno CLI
+        run: |
+          curl -fsSL -o kyverno.tgz "https://github.com/kyverno/kyverno/releases/download/${KYVERNO_VERSION}/kyverno-cli_${KYVERNO_VERSION}_linux_x86_64.tar.gz"
+          echo "${KYVERNO_SHA256}  kyverno.tgz" | sha256sum -c -
+          tar -xzf kyverno.tgz kyverno
+          sudo install -m 0755 kyverno /usr/local/bin/kyverno
+
+      - name: Build chart dependencies (file:// sub-charts)
+        run: |
+          for dir in */; do
+            chart=${dir%/}
+            [ -f "$chart/Chart.yaml" ] || continue
+            case "$chart" in monitoring|platform-demo) continue ;; esac
+            grep -q 'repository:' "$chart/Chart.yaml" && helm dependency build "$chart"
+          done
+
+      # Unit tests for the policies (policies/tests), then every rendered workload and add-on of every environment is evaluated
+      # against them, so a chart change that admission would refuse fails here and not at sync time.
+      - name: Render environments and run the policy checks
+        run: |
+          python3 .github/scripts/render-envs.py rendered
+          .github/scripts/policy-check.sh rendered
 
   # ─── repo hygiene ─────────────────────────────────────────────────────────
 

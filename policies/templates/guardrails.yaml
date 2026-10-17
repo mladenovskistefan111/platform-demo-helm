@@ -107,7 +107,8 @@
 - name: isWorkload
   expression: >-
     object.metadata.name in variables.workload ||
-    (has(object.metadata.labels) && object.metadata.labels['platform.demo/profile'] == 'workload')` (toJson (get .Values.scopes "workload")) (toJson (get .Values.scopes "platform")))
+    (has(object.metadata.labels) && 'platform.demo/profile' in object.metadata.labels &&
+     object.metadata.labels['platform.demo/profile'] == 'workload')` (toJson (get .Values.scopes "workload")) (toJson (get .Values.scopes "platform")))
   "validations" `- expression: >-
     !variables.isWorkload || variables.level == 'restricted'
   messageExpression: >-

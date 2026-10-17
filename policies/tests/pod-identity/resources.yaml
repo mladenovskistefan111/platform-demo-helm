@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Namespace
+metadata: { name: platform-demo, labels: { kubernetes.io/metadata.name: platform-demo } }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: good, namespace: platform-demo, labels: { app.kubernetes.io/name: frontend } }
+spec: { serviceAccountName: frontend, containers: [{ name: c, image: "mladenovskistefan/frontend@sha256:aa" }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: stolen-label-default-sa, namespace: platform-demo, labels: { app.kubernetes.io/name: frontend } }
+spec: { serviceAccountName: default, containers: [{ name: c, image: "x" }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: stolen-label-other-sa, namespace: platform-demo, labels: { app.kubernetes.io/name: frontend } }
+spec: { serviceAccountName: checkout-service, containers: [{ name: c, image: "x" }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: unknown-name, namespace: platform-demo, labels: { app.kubernetes.io/name: miner } }
+spec: { serviceAccountName: miner, containers: [{ name: c, image: "x" }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: no-label, namespace: platform-demo }
+spec: { serviceAccountName: default, containers: [{ name: c, image: "x" }] }

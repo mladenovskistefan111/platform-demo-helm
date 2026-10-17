@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: Namespace
+metadata: { name: platform-demo, labels: { kubernetes.io/metadata.name: platform-demo } }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: good, namespace: platform-demo, labels: { app.kubernetes.io/name: x } }
+spec:
+  serviceAccountName: x
+  automountServiceAccountToken: false
+  containers:
+    - name: c
+      image: i
+      resources: { requests: { cpu: 10m, memory: 16Mi }, limits: { memory: 32Mi } }
+      readinessProbe: { tcpSocket: { port: 80 } }
+      livenessProbe: { tcpSocket: { port: 80 } }
+      securityContext: { readOnlyRootFilesystem: true }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: no-requests, namespace: platform-demo, labels: { app.kubernetes.io/name: x } }
+spec:
+  serviceAccountName: x
+  automountServiceAccountToken: false
+  containers:
+    - { name: c, image: i, resources: { limits: { memory: 32Mi } }, readinessProbe: { tcpSocket: { port: 80 } }, livenessProbe: { tcpSocket: { port: 80 } }, securityContext: { readOnlyRootFilesystem: true } }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: no-mem-limit, namespace: platform-demo, labels: { app.kubernetes.io/name: x } }
+spec:
+  serviceAccountName: x
+  automountServiceAccountToken: false
+  containers:
+    - { name: c, image: i, resources: { requests: { cpu: 10m, memory: 16Mi } }, readinessProbe: { tcpSocket: { port: 80 } }, livenessProbe: { tcpSocket: { port: 80 } }, securityContext: { readOnlyRootFilesystem: true } }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: writable-rootfs, namespace: platform-demo, labels: { app.kubernetes.io/name: x } }
+spec:
+  serviceAccountName: x
+  automountServiceAccountToken: false
+  containers:
+    - { name: c, image: i, resources: { requests: { cpu: 10m, memory: 16Mi }, limits: { memory: 32Mi } }, readinessProbe: { tcpSocket: { port: 80 } }, livenessProbe: { tcpSocket: { port: 80 } }, securityContext: { readOnlyRootFilesystem: false } }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: no-probes, namespace: platform-demo, labels: { app.kubernetes.io/name: x } }
+spec:
+  serviceAccountName: x
+  automountServiceAccountToken: false
+  containers:
+    - { name: c, image: i, resources: { requests: { cpu: 10m, memory: 16Mi }, limits: { memory: 32Mi } }, securityContext: { readOnlyRootFilesystem: true } }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: job-pod-no-probes, namespace: platform-demo, labels: { app.kubernetes.io/name: x }, ownerReferences: [{ apiVersion: batch/v1, kind: Job, name: j, uid: u }] }
+spec:
+  serviceAccountName: x
+  automountServiceAccountToken: false
+  containers:
+    - { name: c, image: i, resources: { requests: { cpu: 10m, memory: 16Mi }, limits: { memory: 32Mi } }, securityContext: { readOnlyRootFilesystem: true } }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: default-sa, namespace: platform-demo, labels: { app.kubernetes.io/name: x } }
+spec:
+  serviceAccountName: default
+  automountServiceAccountToken: false
+  containers:
+    - { name: c, image: i }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: token-mounted, namespace: platform-demo, labels: { app.kubernetes.io/name: x } }
+spec:
+  serviceAccountName: x
+  automountServiceAccountToken: true
+  containers:
+    - { name: c, image: i }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: token-unset, namespace: platform-demo, labels: { app.kubernetes.io/name: x } }
+spec:
+  serviceAccountName: x
+  containers:
+    - { name: c, image: i }

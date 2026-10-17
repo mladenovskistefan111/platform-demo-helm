@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: Namespace
+metadata: { name: platform-demo, labels: { kubernetes.io/metadata.name: platform-demo, pod-security.kubernetes.io/enforce: restricted, platform.demo/profile: workload } }
+---
+apiVersion: v1
+kind: Namespace
+metadata: { name: gateway-system, labels: { kubernetes.io/metadata.name: gateway-system } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: clusterip, namespace: platform-demo }
+spec: { type: ClusterIP, ports: [{ port: 80 }] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: nodeport, namespace: platform-demo }
+spec: { type: NodePort, ports: [{ port: 80 }] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: loadbalancer, namespace: platform-demo }
+spec: { type: LoadBalancer, ports: [{ port: 80 }] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: external-ip, namespace: platform-demo }
+spec: { type: ClusterIP, externalIPs: ["1.2.3.4"], ports: [{ port: 80 }] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: gateway-nodeport, namespace: gateway-system }
+spec: { type: NodePort, ports: [{ port: 80 }] }
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata: { name: ours, namespace: platform-demo }
+spec: { hostnames: [shop.platform-demo.test], rules: [{ backendRefs: [{ name: frontend, port: 80 }] }] }
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata: { name: foreign, namespace: platform-demo }
+spec: { hostnames: [bank.example.com], rules: [{ backendRefs: [{ name: frontend, port: 80 }] }] }
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata: { name: suffix-trick, namespace: platform-demo }
+spec: { hostnames: [evilplatform-demo.test], rules: [{ backendRefs: [{ name: frontend, port: 80 }] }] }
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata: { name: no-hostnames, namespace: platform-demo }
+spec: { rules: [{ backendRefs: [{ name: frontend, port: 80 }] }] }
+---
+apiVersion: v1
+kind: Namespace
+metadata: { name: sneaky, labels: { platform.demo/profile: workload } }
+---
+apiVersion: v1
+kind: Namespace
+metadata: { name: proper, labels: { platform.demo/profile: workload, pod-security.kubernetes.io/enforce: restricted } }
+---
+apiVersion: v1
+kind: Namespace
+metadata: { name: monitoring, labels: { pod-security.kubernetes.io/enforce: baseline } }
+---
+apiVersion: v1
+kind: Namespace
+metadata: { name: argocd, labels: { pod-security.kubernetes.io/enforce: privileged } }
+---
+apiVersion: v1
+kind: Namespace
+metadata: { name: unrelated }

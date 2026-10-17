@@ -1,5 +1,5 @@
 {{- define "ml.image" -}}
-{{ .repository }}:{{ .tag }}
+{{ .repository }}:{{ .tag }}{{ if .digest }}@{{ .digest }}{{ end }}
 {{- end }}
 
 {{- define "ml.labels" -}}

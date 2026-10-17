@@ -1,0 +1,208 @@
+name: CI
+
+# Pull-request gate for the charts. Nothing runs on a plain push.
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HELM_VERSION: v3.20.1
+  KUBECONFORM_VERSION: v0.8.0
+  KUBECONFORM_SHA256: 9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
+  COSIGN_VERSION: v2.5.2
+  KUBERNETES_VERSION: 1.33.0
+
+jobs:
+  # ─── helm lint + render ───────────────────────────────────────────────────
+
+  lint-and-render:
+    name: Helm lint & render
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build chart dependencies (file:// sub-charts)
+        run: |
+          # Every chart except the umbrella first, then the umbrella (it packages the others).
+          for dir in */; do
+            chart=${dir%/}
+            [ -f "$chart/Chart.yaml" ] || continue
+            case "$chart" in monitoring|platform-demo) continue ;; esac
+            grep -q 'repository:' "$chart/Chart.yaml" && helm dependency build "$chart"
+          done
+          helm dependency build platform-demo
+
+      - name: helm lint
+        run: |
+          status=0
+          for dir in */; do
+            chart=${dir%/}
+            [ -f "$chart/Chart.yaml" ] || continue
+            [ "$chart" = monitoring ] && continue # vendored upstream charts, not ours to lint
+            args=()
+            case "$chart" in
+              product-catalog-db) args=(--set auth.password=x) ;;
+              platform-demo) args=(--set product-catalog-db.auth.password=x) ;;
+            esac
+            echo "::group::helm lint $chart"
+            helm lint "$chart" "${args[@]}" || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+
+      - name: helm template (every configuration we ship)
+        run: |
+          mkdir -p rendered
+          helm template platform-demo ./platform-demo -f platform-demo/values-dev.yaml > rendered/umbrella-dev.yaml
+          helm template platform-demo ./platform-demo --set product-catalog-db.auth.password=x > rendered/umbrella-default.yaml
+          helm template platform-demo ./platform-demo -f platform-demo/values-prod.yaml \
+            --set product-catalog-db.auth.existingSecret=s > rendered/umbrella-prod.yaml
+          helm template platform-gateway ./platform-gateway > rendered/gateway.yaml
+          helm template monitoring-local ./monitoring-local > rendered/monitoring-local.yaml
+          wc -l rendered/*.yaml
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rendered
+          path: rendered/
+          retention-days: 7
+
+  # ─── schema validation ────────────────────────────────────────────────────
+
+  kubeconform:
+    name: kubeconform
+    runs-on: ubuntu-latest
+    needs: [lint-and-render]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: rendered
+          path: rendered
+
+      - name: Install kubeconform
+        run: |
+          curl -fsSL -o kubeconform.tgz "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          echo "${KUBECONFORM_SHA256}  kubeconform.tgz" | sha256sum -c -
+          tar -xzf kubeconform.tgz kubeconform
+
+      - name: Validate rendered manifests against the Kubernetes and CRD schemas
+        run: |
+          ./kubeconform -strict -summary -kubernetes-version "$KUBERNETES_VERSION" \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            rendered/*.yaml
+
+  # ─── misconfiguration scan ────────────────────────────────────────────────
+
+  trivy-config:
+    name: Trivy config scan
+    runs-on: ubuntu-latest
+    needs: [lint-and-render]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: rendered
+          path: rendered
+
+      # The charts that deploy to real clusters must be clean (HIGH/CRITICAL fail the build).
+      - name: Trivy config - application and gateway charts
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        with:
+          scan-type: config
+          scan-ref: rendered
+          skip-files: rendered/monitoring-local.yaml
+          severity: HIGH,CRITICAL
+          exit-code: 1
+          format: table
+
+      # monitoring-local is a laptop-only chart running stock Grafana images; report, don't block.
+      - name: Trivy config - monitoring-local (report only)
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        with:
+          scan-type: config
+          scan-ref: rendered/monitoring-local.yaml
+          severity: HIGH,CRITICAL
+          exit-code: 0
+          format: table
+
+  # ─── promotion gate ───────────────────────────────────────────────────────
+
+  verify-signatures:
+    name: Cosign verify images
+    runs-on: ubuntu-latest
+    needs: [lint-and-render]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: rendered
+          path: rendered
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+        with:
+          cosign-release: ${{ env.COSIGN_VERSION }}
+
+      # Every image of ours that the charts deploy must be pinned by digest and signed (keyless) by a
+      # workflow in one of our repositories: either the service's own pipeline or the shared
+      # platform-demo-workflows release. Anything pushed by hand fails the promotion.
+      - name: Verify digests and signatures
+        env:
+          # Images known to have no pipeline yet. Remove an entry as soon as its repo gets one.
+          UNSIGNED_ALLOWLIST: product-catalog-db
+        run: |
+          images=$(grep -hE '^\s+image:' rendered/umbrella-*.yaml | sed -E 's/^\s*image:\s*//; s/"//g' | sort -u | grep '^mladenovskistefan/' || true)
+          [ -n "$images" ] || { echo "::error::no application images found in the rendered charts"; exit 1; }
+          status=0
+          for ref in $images; do
+            name=${ref#mladenovskistefan/}; name=${name%%[@:]*}
+            if [[ "$ref" != *@sha256:* ]]; then
+              echo "::error::$ref is not pinned by digest"; status=1; continue
+            fi
+            if cosign verify \
+                 --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+                 --certificate-identity-regexp '^https://github.com/mladenovskistefan111/[a-z-]+/\.github/workflows/[a-z.-]+@.+$' \
+                 "$ref" > /dev/null 2>&1; then
+              echo "signed    $ref"
+            elif [[ " $UNSIGNED_ALLOWLIST " == *" $name "* ]]; then
+              echo "::warning::$ref has no valid signature (allow-listed: $name has no pipeline yet)"
+            else
+              echo "::error::$ref has no valid signature from our pipelines"; status=1
+            fi
+          done
+          exit $status
+
+  # ─── repo hygiene ─────────────────────────────────────────────────────────
+
+  secret-scan:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: mladenovskistefan111/platform-demo-workflows/.github/workflows/secret-scan.yaml@4cc2445b63ac31d446d5b429b6eb293d0ff3bffe # v1.2.0
+
+  workflows:
+    permissions:
+      contents: read
+    uses: mladenovskistefan111/platform-demo-workflows/.github/workflows/workflow-lint.yaml@4cc2445b63ac31d446d5b429b6eb293d0ff3bffe # v1.2.0

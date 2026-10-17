@@ -1,0 +1,32 @@
+# Local secret blocking. One-time setup per clone:  pipx install pre-commit && pre-commit install
+# - every commit: gitleaks scans the staged changes, plus private-key / large-file checks
+# - every push:   gitleaks scans the whole git history before anything leaves the machine
+# This is a fast local guard (git push --no-verify skips it); GitHub push protection and the
+# CI secret scan are the enforcing layers.
+default_install_hook_types: [pre-commit, pre-push]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # frozen: v6.0.0
+    hooks:
+      - id: detect-private-key
+        stages: [pre-commit]
+      - id: check-added-large-files
+        stages: [pre-commit]
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e # frozen: v8.30.1
+    hooks:
+      - id: gitleaks
+        stages: [pre-commit]
+
+  - repo: local
+    hooks:
+      - id: gitleaks-history
+        name: gitleaks (full history, before push)
+        language: golang
+        additional_dependencies: [github.com/zricethezav/gitleaks/v8@v8.30.1]
+        entry: gitleaks git --redact --verbose
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

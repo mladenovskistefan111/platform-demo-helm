@@ -1,24 +1,22 @@
-# Hostnames are built from `domain`:  shop.<domain>  and  grafana.<domain>
+# Hostnames are built from `domain`:  shop.<domain>, grafana.<domain>, argocd.<domain>, hubble.<domain>
 domain: platform-demo.test
 
-gatewayClassName: platform-envoy
-controllerName: gateway.envoyproxy.io/gatewayclass-controller
+# Cilium registers this GatewayClass when gatewayAPI.enabled=true.
+gatewayClassName: cilium
 
 gateway:
   name: platform-gateway
   namespace: gateway-system
   tlsSecretName: platform-tls        # kubernetes.io/tls Secret in gateway.namespace covering *.<domain>
 
-# Envoy Gateway creates one proxy Service per Gateway. On kind there is no LoadBalancer, so it is a NodePort
-# with fixed ports that kind/cluster.yaml maps to the host (127.0.0.1:80 / :443).
-envoyProxy:
-  namespace: envoy-gateway-system
-  service:
-    type: NodePort
-    httpNodePort: 30080
-    httpsNodePort: 30443
-  replicas: 1
+# Ports the Gateway listens on. Behind a cloud LoadBalancer use 80/443. With Cilium's host-network mode (kind, bare
+# metal without LB) the ports must be > 1023: see values-kind.yaml.
+listeners:
+  http: 80
+  https: 443
 
 routes:
-  shop:    { namespace: platform-demo, service: frontend, port: 80,   host: shop }
-  grafana: { namespace: monitoring,    service: grafana,  port: 3000, host: grafana }
+  shop:    { namespace: platform-demo, service: frontend,      port: 80,   host: shop }
+  grafana: { namespace: monitoring,    service: grafana,       port: 3000, host: grafana }
+  argocd:  { namespace: argocd,        service: argocd-server, port: 80,   host: argocd }
+  hubble:  { namespace: kube-system,   service: hubble-ui,     port: 80,   host: hubble }

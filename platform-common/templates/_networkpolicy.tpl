@@ -1,4 +1,19 @@
 {{/*
+Network policy entry point. networkPolicy.type (or global.networkPolicy.type) selects the implementation:
+  kubernetes (default)  a standard networking.k8s.io/v1 NetworkPolicy, works on any CNI that enforces it
+  cilium                a CiliumNetworkPolicy with the same inputs plus mutual authentication (see _ciliumnetworkpolicy.tpl)
+*/}}
+{{- define "platform-common.networkpolicy" -}}
+{{- $global := (.Values.global | default dict) -}}
+{{- $type := (.Values.networkPolicy.type | default (dig "networkPolicy" "type" "kubernetes" $global)) -}}
+{{- if eq $type "cilium" }}
+{{- include "platform-common.ciliumnetworkpolicy" . }}
+{{- else }}
+{{- include "platform-common.k8snetworkpolicy" . }}
+{{- end }}
+{{- end -}}
+
+{{/*
 NetworkPolicy: default-deny for the selected pods, then allow exactly what the service needs.
 
 ingress.from           service names (same namespace) allowed to connect, matched on app.kubernetes.io/name
@@ -8,7 +23,7 @@ egress.dns             allow DNS to kube-dns
 egress.monitoring      allow OTLP/Pyroscope traffic to global.monitoring.namespace
 egress.extra / ingress.extra  raw NetworkPolicy rules
 */}}
-{{- define "platform-common.networkpolicy" -}}
+{{- define "platform-common.k8snetworkpolicy" -}}
 {{- if .Values.networkPolicy.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

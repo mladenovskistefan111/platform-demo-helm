@@ -1,0 +1,4 @@
+# kind: Cilium host-network Gateway, listeners on 8080/8443 published as 80/443 by kind/cluster.yaml
+listeners:
+  http: 8080
+  https: 8443

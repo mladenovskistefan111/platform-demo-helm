@@ -3,7 +3,7 @@ name: ad-service
 description: Ad Service - contextual ads over gRPC (Java 21)
 type: application
 version: 0.2.0
-appVersion: "1.1.0"
+appVersion: "1.0.0"
 kubeVersion: ">=1.27.0-0"
 keywords: [platform-demo, backend]
 maintainers:

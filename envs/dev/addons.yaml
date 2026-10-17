@@ -1,0 +1,2 @@
+- { app: platform-gateway, chart: platform-gateway, namespace: gateway-system }
+- { app: monitoring-local, chart: monitoring-local, namespace: monitoring }

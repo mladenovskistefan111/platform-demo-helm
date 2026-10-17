@@ -1,6 +1,11 @@
-# Layer on top of values-dev.yaml for the local kind cluster fronted by Envoy Gateway:
+# Layer on top of values-dev.yaml for the local kind cluster with Cilium:
 #   helm upgrade --install platform-demo . -n platform-demo -f values-dev.yaml -f values-kind.yaml
+# (The canonical way to deploy is Argo CD from envs/dev; this keeps the plain `helm install` path working.)
+global:
+  networkPolicy:
+    type: cilium
 frontend:
   networkPolicy:
     ingress:
-      fromNamespaces: [envoy-gateway-system]   # the Envoy proxy pods created for the Gateway
+      fromNamespaces: []
+      fromEntities: [ingress]   # Cilium's Gateway

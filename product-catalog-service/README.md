@@ -8,7 +8,7 @@ resources, HPA, PodDisruptionBudget, NetworkPolicy, ServiceAccount.
 ```bash
 helm dependency update            # vendors ../platform-common into charts/
 helm upgrade --install product-catalog-service . -n platform-demo --create-namespace \
-  --set image.tag=1.1.0
+  --set image.tag=1.0.0
 ```
 
 * Service DNS name: `product-catalog-service` (port `3550`). Names are fixed to the chart name on purpose; other services are configured with them.

@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+spec:
+  description: Application workloads and the add-ons they need (gateway routes, monitoring). Namespaced resources only.
+  sourceRepos:
+    - https://github.com/mladenovskistefan111/platform-demo-helm.git
+  destinations:
+    - { name: in-cluster, namespace: platform-demo }
+    - { name: in-cluster, namespace: monitoring }
+    - { name: in-cluster, namespace: gateway-system }
+    # HTTPRoutes for Argo CD and Hubble live next to those services
+    - { name: in-cluster, namespace: argocd }
+    - { name: in-cluster, namespace: kube-system }
+  clusterResourceWhitelist:
+    - { group: "", kind: Namespace }
+    - { group: rbac.authorization.k8s.io, kind: ClusterRole }
+    - { group: rbac.authorization.k8s.io, kind: ClusterRoleBinding }

@@ -8,7 +8,7 @@ metadata:
 spec:
   description: Kyverno (admission control) and the cluster policies. Cluster-scoped by design; sources are this repo and the Kyverno chart only.
   sourceRepos:
-    - https://github.com/mladenovskistefan111/platform-demo-helm.git
+    - https://github.com/platform-boutique/platform-demo-helm.git
     - https://kyverno.github.io/kyverno/
   destinations:
     - { name: in-cluster, namespace: kyverno }

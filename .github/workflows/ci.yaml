@@ -192,7 +192,7 @@ jobs:
             fi
             if cosign verify \
                  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-                 --certificate-identity-regexp '^https://github.com/mladenovskistefan111/[a-z-]+/\.github/workflows/[a-z.-]+@.+$' \
+                 --certificate-identity-regexp '^https://github.com/(mladenovskistefan111|platform-boutique)/[a-z-]+/\.github/workflows/[a-z.-]+@.+$' \
                  "$ref" > /dev/null 2>&1; then
               echo "signed    $ref"
             elif [[ " $UNSIGNED_ALLOWLIST " == *" $name "* ]]; then
@@ -251,9 +251,9 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-    uses: mladenovskistefan111/platform-demo-workflows/.github/workflows/secret-scan.yaml@f2a4c94316f81a91672ebe04906c8aa2c06c69e7 # v2.0.1
+    uses: platform-boutique/platform-demo-workflows/.github/workflows/secret-scan.yaml@28d80c1d4abd81c1529bf593a874640132692e8a # v2.0.2
 
   workflows:
     permissions:
       contents: read
-    uses: mladenovskistefan111/platform-demo-workflows/.github/workflows/workflow-lint.yaml@f2a4c94316f81a91672ebe04906c8aa2c06c69e7 # v2.0.1
+    uses: platform-boutique/platform-demo-workflows/.github/workflows/workflow-lint.yaml@28d80c1d4abd81c1529bf593a874640132692e8a # v2.0.2

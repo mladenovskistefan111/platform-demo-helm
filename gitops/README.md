@@ -45,7 +45,7 @@ Git is polled every 2 minutes (`timeout.reconciliation: 120s`, `requeueAfterSeco
 
 ## Secrets
 
-Git holds no secrets. The DB credentials Secret and the Gateway TLS Secret are created by `kind/up.sh`. For AWS: External Secrets or Sealed Secrets, and cert-manager (see the handoff in the [docs repo](https://github.com/mladenovskistefan111/platform-demo-docs/blob/main/HANDOFF.md)).
+Git holds no secrets. The DB credentials Secret and the Gateway TLS Secret are created by `kind/up.sh`. For AWS: External Secrets or Sealed Secrets, and cert-manager (see the handoff in the [docs repo](https://github.com/platform-boutique/platform-demo-docs/blob/main/HANDOFF.md)).
 
 ## Branch testing and `targetRevision`
 

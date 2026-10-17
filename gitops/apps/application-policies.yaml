@@ -12,7 +12,7 @@ metadata:
 spec:
   project: security
   source:
-    repoURL: https://github.com/mladenovskistefan111/platform-demo-helm.git
+    repoURL: https://github.com/platform-boutique/platform-demo-helm.git
     targetRevision: main
     path: policies
     helm:

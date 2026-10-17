@@ -10,7 +10,7 @@ spec:
   goTemplateOptions: ["missingkey=error"]
   generators:
     - git:
-        repoURL: https://github.com/mladenovskistefan111/platform-demo-helm.git
+        repoURL: https://github.com/platform-boutique/platform-demo-helm.git
         revision: main
         requeueAfterSeconds: 120
         files:
@@ -28,7 +28,7 @@ spec:
     spec:
       project: platform
       source:
-        repoURL: https://github.com/mladenovskistefan111/platform-demo-helm.git
+        repoURL: https://github.com/platform-boutique/platform-demo-helm.git
         targetRevision: main
         path: '{{ .chart }}'
         helm:

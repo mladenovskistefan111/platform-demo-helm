@@ -14,7 +14,6 @@ ad-service/  cart-service/  checkout-service/  currency-service/  email-service/
 frontend/  payment-service/  product-catalog-service/  recommendation-service/  shipping-service/   Deployments
 product-catalog-db/  cart-redis/                                                                      StatefulSets
 monitoring/               vendored upstream charts (unchanged)
-_legacy/                  the previous per-service scaffolds, kept for reference
 ```
 
 Every service chart is ~6 tiny template files that call into `platform-common` (`{{ include "platform-common.deployment" . }}` …) plus a fully commented `values.yaml`, so behaviour is identical everywhere and a fix in the library reaches all charts.
@@ -38,7 +37,7 @@ helm upgrade --install platform-demo . -n platform-demo \
 kubectl -n platform-demo port-forward svc/frontend 8080:80    # http://localhost:8080
 ```
 
-Prerequisites: images `mladenovskistefan/<service>:1.1.0` pushed (they are built locally; see master README §8.6), the monitoring stack reachable at `alloy.monitoring.svc.cluster.local` (or `--set global.monitoring.*`), a CNI that enforces NetworkPolicy, and HTTPS in front of the frontend for real use.
+Prerequisites: the service images on Docker Hub (`mladenovskistefan/<service>`, pinned by `image.digest` in each chart; built, scanned and cosign-signed by each service's `CI - Main`), the monitoring stack reachable at `alloy.monitoring.svc.cluster.local` (or `--set global.monitoring.*`), a CNI that enforces NetworkPolicy, and HTTPS in front of the frontend for real use.
 
 Install one service alone:
 

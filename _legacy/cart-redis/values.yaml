@@ -1,5 +1,0 @@
-namespace: cart-redis
-
-image: redis:7-alpine
-port: 6379
-storage: 1Gi

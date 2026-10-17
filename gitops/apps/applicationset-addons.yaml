@@ -10,7 +10,7 @@ spec:
   generators:
     - git:
         repoURL: https://github.com/mladenovskistefan111/platform-demo-helm.git
-        revision: main
+        revision: feat/argocd-cilium
         requeueAfterSeconds: 120
         files:
           - path: "envs/*/addons.yaml"
@@ -28,7 +28,7 @@ spec:
       project: platform
       source:
         repoURL: https://github.com/mladenovskistefan111/platform-demo-helm.git
-        targetRevision: main
+        targetRevision: feat/argocd-cilium
         path: '{{ .chart }}'
         helm:
           releaseName: '{{ .app }}'

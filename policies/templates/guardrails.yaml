@@ -1,0 +1,118 @@
+{{- $policed := concat (get .Values.scopes "workload") (get .Values.scopes "platform") -}}
+
+{{- include "pd.vpol" (dict "root" . "name" "restrict-service-types" "scopes" (list "workload")
+  "title" "Services are ClusterIP only"
+  "description" "NodePort and LoadBalancer Services and externalIPs open a path around the Gateway (the only ingress). Only the Cilium-managed Gateway Service in gateway-system may be a NodePort."
+  "rules" `- apiGroups: [""]
+  apiVersions: ["v1"]
+  operations: ["CREATE", "UPDATE"]
+  resources: ["services"]`
+  "nsSelector" `namespaceSelector:
+  matchExpressions:
+    - { key: kubernetes.io/metadata.name, operator: NotIn, values: [gateway-system] }`
+  "validations" `- expression: >-
+    !has(object.spec.type) || object.spec.type == 'ClusterIP'
+  messageExpression: >-
+    'Service type ' + object.spec.type + ' is not allowed; expose it through the Gateway (HTTPRoute) instead'
+- expression: >-
+    !has(object.spec.externalIPs) || size(object.spec.externalIPs) == 0
+  message: externalIPs are not allowed`) }}
+
+{{- include "pd.vpol" (dict "root" . "name" "restrict-route-hostnames" "scopes" (list "workload")
+  "title" "HTTPRoutes only claim our domain"
+  "description" "A route must name its hostnames and every one must be under the platform domain, so nobody can capture traffic for another host on the shared Gateway."
+  "clusterWide" true
+  "rules" `- apiGroups: ["gateway.networking.k8s.io"]
+  apiVersions: ["*"]
+  operations: ["CREATE", "UPDATE"]
+  resources: ["httproutes"]`
+  "variables" (printf `- name: domain
+  expression: "'.%s'"` .Values.domain)
+  "validations" `- expression: >-
+    has(object.spec.hostnames) && size(object.spec.hostnames) > 0 &&
+    object.spec.hostnames.all(h, h.endsWith(variables.domain))
+  messageExpression: >-
+    'HTTPRoute hostnames must be set and end with ' + variables.domain`) }}
+
+{{- include "pd.vpol" (dict "root" . "name" "protect-network-policy" "scopes" (list "workload") "background" false
+  "title" "Only Argo CD and admins change network policy and routing"
+  "description" "CiliumNetworkPolicies decide who may talk to whom (and where mutual authentication is required); Gateways and HTTPRoutes decide what is exposed. Changes from anything but Argo CD, Kyverno's generator, the cluster's own controllers or a cluster admin are refused, so a compromised workload cannot open its own firewall."
+  "rules" `- apiGroups: ["cilium.io"]
+  apiVersions: ["*"]
+  operations: ["CREATE", "UPDATE", "DELETE"]
+  resources: ["ciliumnetworkpolicies", "ciliumclusterwidenetworkpolicies"]
+- apiGroups: ["networking.k8s.io"]
+  apiVersions: ["*"]
+  operations: ["CREATE", "UPDATE", "DELETE"]
+  resources: ["networkpolicies"]
+- apiGroups: ["gateway.networking.k8s.io"]
+  apiVersions: ["*"]
+  operations: ["CREATE", "UPDATE", "DELETE"]
+  resources: ["gateways", "httproutes"]`
+  "nsSelector" (printf `namespaceSelector:
+  matchExpressions:
+    - { key: kubernetes.io/metadata.name, operator: In, values: %s }` (toJson (concat $policed (list "gateway-system"))))
+  "variables" (printf `- name: users
+  expression: '%s'
+- name: groups
+  expression: '%s'` (toJson .Values.protectedChanges.users) (toJson .Values.protectedChanges.groups))
+  "validations" `- expression: >-
+    request.userInfo.username in variables.users ||
+    request.userInfo.groups.exists(g, g in variables.groups)
+  messageExpression: >-
+    request.userInfo.username + ' may not ' + request.operation.lowerAscii() + ' ' + request.resource.resource +
+    ' here; network policy and routing change through Git (Argo CD) or a cluster admin'`) }}
+
+{{- include "pd.vpol" (dict "root" . "name" "no-exec-without-break-glass" "scopes" (list "workload") "background" false
+  "title" "No exec / attach / debug into workloads without break-glass"
+  "description" (printf "kubectl exec, attach and ephemeral debug containers are refused in workload namespaces unless the pod carries the annotation %s=true, set deliberately for the duration of an incident." .Values.breakGlass.annotation)
+  "rules" `- apiGroups: [""]
+  apiVersions: ["v1"]
+  operations: ["CONNECT"]
+  resources: ["pods/exec", "pods/attach"]
+- apiGroups: [""]
+  apiVersions: ["v1"]
+  operations: ["UPDATE"]
+  resources: ["pods/ephemeralcontainers"]`
+  "variables" (printf `- name: pod
+  expression: >-
+    request.subResource == 'ephemeralcontainers'
+      ? dyn(object)
+      : dyn(resource.Get('v1', 'pods', request.namespace, request.name))
+- name: annotation
+  expression: "'%s'"` .Values.breakGlass.annotation)
+  "validations" `- expression: >-
+    has(variables.pod.metadata.annotations) && variables.annotation in variables.pod.metadata.annotations &&
+    variables.pod.metadata.annotations[variables.annotation] == 'true'
+  messageExpression: >-
+    request.subResource + ' into ' + request.namespace + '/' + request.name + ' is blocked; annotate the pod ' +
+    variables.annotation + '=true to break glass (and remove it afterwards)'`) }}
+
+{{- include "pd.vpol" (dict "root" . "name" "namespace-pod-security" "scopes" (list "workload")
+  "title" "Policed namespaces keep their Pod Security level"
+  "description" "Workload namespaces must enforce the restricted Pod Security Standard and platform namespaces at least baseline; the label cannot be removed or lowered."
+  "clusterWide" true
+  "rules" `- apiGroups: [""]
+  apiVersions: ["v1"]
+  operations: ["CREATE", "UPDATE"]
+  resources: ["namespaces"]`
+  "variables" (printf `- name: workload
+  expression: '%s'
+- name: platform
+  expression: '%s'
+- name: level
+  expression: >-
+    has(object.metadata.labels) && 'pod-security.kubernetes.io/enforce' in object.metadata.labels
+    ? object.metadata.labels['pod-security.kubernetes.io/enforce'] : 'none'
+- name: isWorkload
+  expression: >-
+    object.metadata.name in variables.workload ||
+    (has(object.metadata.labels) && object.metadata.labels['platform.demo/profile'] == 'workload')` (toJson (get .Values.scopes "workload")) (toJson (get .Values.scopes "platform")))
+  "validations" `- expression: >-
+    !variables.isWorkload || variables.level == 'restricted'
+  messageExpression: >-
+    'workload namespace ' + object.metadata.name + ' must enforce Pod Security "restricted" (is "' + variables.level + '")'
+- expression: >-
+    !(object.metadata.name in variables.platform) || variables.level in ['baseline', 'restricted']
+  messageExpression: >-
+    'platform namespace ' + object.metadata.name + ' must enforce Pod Security "baseline" or "restricted" (is "' + variables.level + '")'`) }}

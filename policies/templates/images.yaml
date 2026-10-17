@@ -1,0 +1,34 @@
+{{- /* Allowed registries/repositories and digest pinning, one policy per scope with that scope's allow-list. */ -}}
+{{- range $scope, $cfg := .Values.images }}
+{{- include "pd.vpol" (dict "root" $ "name" "image-source" "scopes" (list $scope)
+  "title" "Images come from allowed repositories, pinned by digest"
+  "description" "Every container (init, regular, ephemeral) must use an image from the scope's repository allow-list. Tags are not accepted except for repositories explicitly exempted; :latest is never accepted."
+  "rules" (include "pd.podRules" $)
+  "variables" (printf `- name: refs
+  expression: >-
+    object.spec.containers.map(c, c.image) +
+    (has(object.spec.initContainers) ? object.spec.initContainers.map(c, c.image) : []) +
+    (has(object.spec.ephemeralContainers) ? object.spec.ephemeralContainers.map(c, c.image) : [])
+- name: allowed
+  expression: '%s'
+- name: digestExempt
+  expression: '%s'` (toJson $cfg.repositories) (toJson ($cfg.digestExempt | default (list))))
+  "validations" `- expression: >-
+    variables.refs.all(r, variables.allowed.exists(a,
+      a.endsWith('/') ? (image(r).registry() + '/' + image(r).repository()).startsWith(a)
+                      : (image(r).registry() + '/' + image(r).repository()) == a))
+  messageExpression: >-
+    'image from a repository that is not allowed here: ' +
+    variables.refs.filter(r, !variables.allowed.exists(a,
+      a.endsWith('/') ? (image(r).registry() + '/' + image(r).repository()).startsWith(a)
+                      : (image(r).registry() + '/' + image(r).repository()) == a)).join(', ')
+- expression: >-
+    variables.refs.all(r, image(r).containsDigest() ||
+      variables.digestExempt.exists(e, e == image(r).registry() + '/' + image(r).repository()))
+  messageExpression: >-
+    'images must be pinned by digest (name@sha256:...): ' +
+    variables.refs.filter(r, !image(r).containsDigest()).join(', ')
+- expression: >-
+    !variables.refs.exists(r, !image(r).containsDigest() && (image(r).identifier() == 'latest' || image(r).identifier() == ''))
+  message: ':latest (or an untagged image) is not allowed'`) }}
+{{- end }}

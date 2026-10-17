@@ -1,0 +1,64 @@
+{{- if .Values.baseline.enabled }}
+---
+apiVersion: policies.kyverno.io/v1
+kind: GeneratingPolicy
+metadata:
+  name: pd-namespace-baseline
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: "Every workload namespace gets quota, default limits and default-deny"
+    policies.kyverno.io/description: "For namespaces labelled platform.demo/profile=workload: a ResourceQuota, a LimitRange (defaults for containers that declare nothing) and a default-deny CiliumNetworkPolicy, so a pod without its own policy can neither be reached nor reach anything. Kept in sync with this policy."
+spec:
+  evaluation:
+    synchronize: { enabled: true }
+    generateExisting: { enabled: true }
+  matchConstraints:
+    objectSelector:
+      matchLabels: { platform.demo/profile: workload }
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["namespaces"]
+  variables:
+    - name: nsName
+      expression: object.metadata.name
+  generate:
+    - template:
+        interpolate: cel
+        value: |
+          apiVersion: v1
+          kind: ResourceQuota
+          metadata:
+            name: baseline
+            namespace: (( variables.nsName ))
+          spec:
+            hard:
+              pods: {{ .Values.baseline.quota.pods | quote }}
+              requests.cpu: {{ .Values.baseline.quota.requestsCpu | quote }}
+              requests.memory: {{ .Values.baseline.quota.requestsMemory | quote }}
+              limits.memory: {{ .Values.baseline.quota.limitsMemory | quote }}
+          ---
+          apiVersion: v1
+          kind: LimitRange
+          metadata:
+            name: baseline
+            namespace: (( variables.nsName ))
+          spec:
+            limits:
+              - type: Container
+                defaultRequest: {{ toJson .Values.baseline.limitRange.defaultRequest }}
+                default: {{ toJson .Values.baseline.limitRange.default }}
+          ---
+          apiVersion: cilium.io/v2
+          kind: CiliumNetworkPolicy
+          metadata:
+            name: default-deny
+            namespace: (( variables.nsName ))
+          spec:
+            description: Default deny in both directions; workloads add their own allow rules (platform-common).
+            endpointSelector: {}
+            ingress: [{}]
+            egress: [{}]
+{{- end }}

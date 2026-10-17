@@ -1,0 +1,19 @@
+{{- /* Exceptions live in the kyverno namespace on purpose: Kyverno only honours PolicyExceptions from there
+       (gitops/kyverno/values.yaml), so nobody can exempt their own workload from inside its namespace. */ -}}
+{{- range .Values.verifyImages.unsigned }}
+---
+apiVersion: policies.kyverno.io/v1
+kind: PolicyException
+metadata:
+  name: unsigned-{{ .name }}
+  namespace: kyverno
+  labels:
+    {{- include "pd.labels" $ | nindent 4 }}
+  annotations:
+    platform.demo/reason: {{ .reason | quote }}
+spec:
+  policyRefs:
+    - { name: pd-verify-images, kind: ImageValidatingPolicy }
+  images:
+    - {{ .glob | quote }}
+{{- end }}

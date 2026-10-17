@@ -20,11 +20,28 @@ backgroundController:
   resources:
     requests: { cpu: 25m, memory: 64Mi }
     limits: { memory: 256Mi }
+  rbac:
+    clusterRole:
+      # The namespace baseline (GeneratingPolicy) creates a default-deny CiliumNetworkPolicy per workload namespace.
+      extraResources:
+        - apiGroups: [cilium.io]
+          resources: [ciliumnetworkpolicies]
+          verbs: [get, list, watch, create, update, patch, delete]
 reportsController:
   replicas: 1
   resources:
     requests: { cpu: 25m, memory: 64Mi }
     limits: { memory: 256Mi }
+  rbac:
+    clusterRole:
+      # Background scans read the kinds our guardrail policies validate.
+      extraResources:
+        - apiGroups: [gateway.networking.k8s.io]
+          resources: [gateways, httproutes]
+          verbs: [get, list, watch]
+        - apiGroups: [cilium.io]
+          resources: [ciliumnetworkpolicies, ciliumclusterwidenetworkpolicies]
+          verbs: [get, list, watch]
 
 features:
   # PolicyExceptions are honoured only when created in the kyverno namespace (i.e. by whoever administers Kyverno),

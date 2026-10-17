@@ -1,0 +1,40 @@
+{{- if .Values.verifyImages.enabled }}
+{{- $v := .Values.verifyImages }}
+---
+apiVersion: policies.kyverno.io/v1
+kind: ImageValidatingPolicy
+metadata:
+  name: pd-verify-images
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: "Our images are signed by our pipelines"
+    policies.kyverno.io/description: "Images from our Docker Hub namespace must carry a keyless cosign signature (classic tag format) made by a GitHub Actions workflow of one of our repositories - the same check the Helm CI runs before promotion. What is signed is what Trivy scanned: the release workflow promotes the scanned digest."
+spec:
+  {{- include "pd.actionSpec" (list . "verify-images" "workload") | nindent 2 }}
+  webhookConfiguration:
+    timeoutSeconds: 20
+  matchConstraints:
+    {{- include "pd.nsSelector" (list . "workload") | nindent 4 }}
+    resourceRules:
+      {{- include "pd.podRules" . | nindent 6 }}
+  matchImageReferences:
+    - glob: {{ $v.glob | quote }}
+  attestors:
+    - name: ci
+      cosign:
+        keyless:
+          identities:
+            - issuer: {{ $v.issuer | quote }}
+              subjectRegExp: {{ $v.subjectRegExp | quote }}
+        ctlog:
+          url: {{ $v.rekorUrl | quote }}
+  validationConfigurations:
+    required: true
+    verifyDigest: true
+    mutateDigest: false
+  validations:
+    - expression: >-
+        images.containers.map(image, verifyImageSignatures(image, [attestors.ci])).all(e, e > 0)
+      message: image signature verification failed (no valid keyless cosign signature from our pipelines)
+{{- end }}

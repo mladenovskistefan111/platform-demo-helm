@@ -1,0 +1,2 @@
+# dev: everything audits first; flip policies to Deny one by one (see policies/README.md, "Rolling out").
+defaultAction: Audit

@@ -39,6 +39,12 @@ spec:
       syncPolicy:
         automated: { prune: true, selfHeal: true }
         syncOptions: [CreateNamespace=true, ServerSideApply=true]
+        # Third-party stacks: no privileged pods, and anything that would not pass `restricted` is called out (Kyverno
+        # reports the namespace; see policies/README.md).
+        managedNamespaceMetadata:
+          labels:
+            pod-security.kubernetes.io/enforce: baseline
+            pod-security.kubernetes.io/warn: restricted
         retry:
           limit: 6
           backoff: { duration: 10s, factor: 2, maxDuration: 3m }

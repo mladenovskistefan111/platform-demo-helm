@@ -25,3 +25,23 @@ spec:
         !has(object.spec.initContainers) && !has(object.spec.ephemeralContainers) &&
         object.spec.containers.all(c, c.image.startsWith({{ .imagePrefix | quote }}))
 {{- end }}
+{{- range .Values.exceptions }}
+---
+apiVersion: policies.kyverno.io/v1
+kind: PolicyException
+metadata:
+  name: {{ .name }}
+  namespace: kyverno
+  labels:
+    {{- include "pd.labels" $ | nindent 4 }}
+  annotations:
+    platform.demo/reason: {{ .reason | quote }}
+spec:
+  policyRefs:
+    {{- range .policies }}
+    - { name: {{ . }}, kind: ValidatingPolicy }
+    {{- end }}
+  matchConditions:
+    - name: scope
+      expression: {{ .condition | quote }}
+{{- end }}

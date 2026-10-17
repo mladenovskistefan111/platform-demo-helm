@@ -38,9 +38,17 @@ kubectl -n kube-system rollout status deploy/cilium-operator --timeout=5m
 step "TLS certificate for *.$DOMAIN (local CA in kind/certs/) -> Secret gateway-system/platform-tls"
 DOMAIN="$DOMAIN" bash kind/make-tls.sh
 
-step "Namespace platform-demo (Pod Security 'restricted') and database credentials (random, never in Git)"
-kubectl create ns platform-demo --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-kubectl label ns platform-demo pod-security.kubernetes.io/enforce=restricted --overwrite >/dev/null
+step "Namespace platform-demo (Pod Security 'restricted', workload profile) and database credentials (random, never in Git)"
+# Created with its labels in one request: the Kyverno policy pd-namespace-pod-security refuses a workload namespace without them.
+kubectl apply -f - >/dev/null <<NS
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-demo
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    platform.demo/profile: workload
+NS
 if ! kubectl -n platform-demo get secret product-catalog-db-credentials >/dev/null 2>&1; then
   kubectl -n platform-demo create secret generic product-catalog-db-credentials \
     --from-literal=POSTGRES_DB=product_catalog --from-literal=POSTGRES_USER=catalog_user \

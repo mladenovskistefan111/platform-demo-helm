@@ -98,3 +98,11 @@ baseline:
   limitRange:
     defaultRequest: { cpu: 10m, memory: 32Mi }
     default: { memory: 128Mi }
+
+# Further exceptions to ValidatingPolicies, each rendered as a PolicyException in the kyverno namespace. `condition` is CEL over the
+# admitted object (a pod); keep it as narrow as possible and give a reason.
+exceptions:
+  - name: argocd-controller-no-liveness
+    policies: [pd-require-probes-platform]
+    condition: "object.metadata.namespace == 'argocd' && object.metadata.name.startsWith('argocd-application-controller')"
+    reason: Upstream deliberately ships the application controller without a liveness probe (restarting an overloaded controller makes it worse).

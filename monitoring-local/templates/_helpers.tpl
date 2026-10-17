@@ -21,6 +21,7 @@ seccompProfile:
 
 {{- define "ml.containerSecurity" -}}
 allowPrivilegeEscalation: false
+readOnlyRootFilesystem: true   # writable paths are explicit: the data emptyDirs and /tmp below (Kyverno: pd-readonly-rootfs)
 capabilities:
   drop: [ALL]
 {{- end }}
@@ -87,6 +88,7 @@ spec:
           resources: {{- toYaml $p.resources | nindent 12 }}
           securityContext: {{- include "ml.containerSecurity" $p | nindent 12 }}
           volumeMounts:
+            - { name: tmp, mountPath: /tmp }
             {{- if $p.configMap }}
             - { name: config, mountPath: /etc/{{ $p.name }} }
             {{- end }}
@@ -97,6 +99,7 @@ spec:
             {{- . | nindent 12 }}
             {{- end }}
       volumes:
+        - { name: tmp, emptyDir: { sizeLimit: 64Mi } }
         {{- if $p.configMap }}
         - name: config
           configMap: { name: {{ $p.configMap }} }

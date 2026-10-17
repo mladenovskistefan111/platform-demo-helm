@@ -2,3 +2,9 @@
 # Per-policy overrides go under `actions`, e.g. { pod-identity: Audit } to demote one while investigating.
 defaultAction: Deny
 enforcePlatform: false
+
+verifyImages:
+  # Docker Hub throttles anonymous pulls (100 per 6 h per IP) and a fresh `up.sh` uses most of them, so a signature LOOKUP can fail
+  # with TOOMANYREQUESTS. Until a read-only Docker Hub token is configured (pullSecret, see policies/README.md) a failed lookup
+  # admits the pod; a missing/invalid signature is still denied.
+  failurePolicy: Ignore

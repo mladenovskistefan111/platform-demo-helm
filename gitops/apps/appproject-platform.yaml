@@ -14,6 +14,9 @@ spec:
     # HTTPRoutes for Argo CD and Hubble live next to those services
     - { name: in-cluster, namespace: argocd }
     - { name: in-cluster, namespace: kube-system }
+    # the developer portal and the single sign-on provider (add-ons dex and backstage)
+    - { name: in-cluster, namespace: backstage }
+    - { name: in-cluster, namespace: sso }
   clusterResourceWhitelist:
     - { group: "", kind: Namespace }
     - { group: rbac.authorization.k8s.io, kind: ClusterRole }

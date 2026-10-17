@@ -1,4 +1,4 @@
-# Hostnames are built from `domain`:  shop.<domain>, grafana.<domain>, argocd.<domain>, hubble.<domain>
+# Hostnames are built from `domain`:  shop, grafana, argocd, hubble, backstage, dex . <domain>
 domain: platform-demo.test
 
 # Cilium registers this GatewayClass when gatewayAPI.enabled=true.
@@ -20,3 +20,5 @@ routes:
   grafana: { namespace: monitoring,    service: grafana,       port: 3000, host: grafana }
   argocd:  { namespace: argocd,        service: argocd-server, port: 80,   host: argocd }
   hubble:  { namespace: kube-system,   service: hubble-ui,     port: 80,   host: hubble }
+  backstage: { namespace: backstage,   service: backstage,     port: 80,   host: backstage }
+  dex:     { namespace: sso,           service: dex,           port: 80,   host: dex }

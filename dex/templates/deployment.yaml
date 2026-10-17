@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dex
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "dex.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dex
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels: {{- include "dex.labels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: dex
+          image: {{ include "dex.image" .Values.images.dex }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          args: ["dex", "serve", "/etc/dex/config.yaml"]
+          envFrom:
+            - secretRef: { name: {{ .Values.secretName }} }
+          ports:
+            - { name: http, containerPort: 5556 }
+            - { name: https, containerPort: 5557 }
+            - { name: telemetry, containerPort: 5558 }
+          readinessProbe:
+            httpGet: { path: /healthz/ready, port: telemetry }
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet: { path: /healthz/live, port: telemetry }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            failureThreshold: 6
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: config, mountPath: /etc/dex/config.yaml, subPath: config.yaml, readOnly: true }
+            - { name: tls, mountPath: /etc/dex/tls, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: config
+          configMap: { name: dex }
+        - name: tls
+          secret: { secretName: {{ .Values.tlsSecretName }} }
+        - { name: tmp, emptyDir: { sizeLimit: 16Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dex
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "dex.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: dex
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    # 80: what the Gateway forwards browsers to (TLS already terminated).
+    # 443: what pods reach as https://dex.<domain> through the CoreDNS rewrite; Dex terminates TLS itself.
+    - { name: http, port: 80, targetPort: http }
+    - { name: https, port: 443, targetPort: https }

@@ -18,6 +18,15 @@ grafana:
   # Local demo: anonymous Admin, no login form (same as docker-compose). Never expose this beyond localhost.
   anonymousAdmin: true
   rootUrl: ""                      # e.g. https://grafana.platform-demo.test
+  # Single sign-on through Dex (platform-demo-helm/dex). Turn anonymousAdmin off when this is on.
+  sso:
+    enabled: false
+    issuer: https://dex.platform-demo.test
+    adminGroup: platform-boutique:maintainers     # members get the Admin role, everybody else Viewer
+    # Secret with GRAFANA_CLIENT_SECRET (same value as in Dex) and GRAFANA_ADMIN_PASSWORD (local admin, used by the portal's
+    # service-account bootstrap only). Never in Git: kind/up.sh creates it.
+    secretName: grafana-oidc
+    caConfigMap: ""                # ConfigMap with the CA that signed Dex's certificate (key ca.crt), if it is a private one
 
 resources:
   alloy:     { requests: { cpu: 50m,  memory: 128Mi }, limits: { memory: 512Mi } }

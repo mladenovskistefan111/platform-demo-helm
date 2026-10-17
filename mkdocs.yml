@@ -1,0 +1,30 @@
+site_name: platform-demo-helm
+site_description: >-
+  Everything that is deployed: the Helm charts for the platform-demo application
+  (10 services, PostgreSQL, Redis), the Gateway API entry point, a local
+  monitoring stack, and the **GitOps configuration** that makes Argo CD deploy
+  them.
+repo_url: https://github.com/platform-boutique/platform-demo-helm
+edit_uri: edit/main/docs/
+nav:
+  - Overview: index.md
+  - How it fits together: how-it-fits.md
+  - Repository layout: layout.md
+  - Quick start: quick-start.md
+  - Promote an image: promote.md
+  - Charts: charts.md
+  - Admission policies: policies.md
+  - GitOps: gitops.md
+  - Local cluster: local-cluster.md
+  - Single sign-on and the portal: sso-and-portal.md
+  - Configure, develop, verify: develop.md
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+plugins:
+  - techdocs-core
+extra_css:
+  - stylesheets/extra.css

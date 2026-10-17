@@ -1,0 +1,9 @@
+# dev = the local kind cluster. Sign-in with a built-in demo user until the GitHub OAuth App exists; when it does:
+#   1. create the OAuth App (callback https://dex.platform-demo.test/callback), put its id/secret into the Secret (kind/sso-secrets.sh),
+#   2. set github.enabled: true here and demoUser.enabled: false, merge.
+domain: platform-demo.test
+issuer: https://dex.platform-demo.test
+github:
+  enabled: false
+demoUser:
+  enabled: true

@@ -1,0 +1,8 @@
+apiVersion: v2
+name: dex
+description: >-
+  Dex, the OpenID Connect provider for single sign-on. People sign in once (GitHub in production, a built-in demo user on a
+  laptop) and Backstage, Argo CD and Grafana trust Dex. Single replica, in-memory storage (sessions are lost on restart).
+type: application
+version: 0.1.0
+appVersion: "2.46.0"

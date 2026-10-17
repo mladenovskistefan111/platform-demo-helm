@@ -12,7 +12,7 @@ enforcePlatform: false
 # Namespaces by profile. Policies name them explicitly (not by label) so a namespace cannot opt out by being relabelled.
 scopes:
   workload: [platform-demo]       # our services: the strict profile
-  platform: [monitoring, argocd]  # third-party stacks: registry/resources/probes checks, never the identity rules
+  platform: [monitoring, argocd, backstage, sso]  # third-party stacks and the portal: registry/resources/probes checks, never the identity rules
 
 # Hostnames HTTPRoutes may claim.
 domain: platform-demo.test
@@ -52,6 +52,9 @@ images:
       - index.docker.io/grafana/mimir
       - index.docker.io/grafana/pyroscope
       - index.docker.io/grafana/tempo
+      - ghcr.io/dexidp/dex
+      - index.docker.io/library/postgres
+      - index.docker.io/mladenovskistefan/platform-demo-backstage
       - quay.io/argoproj/argocd
       - ecr-public.aws.com/docker/library/redis
     # Argo CD's chart pins tags, not digests (upstream releases are immutable, but not by digest).

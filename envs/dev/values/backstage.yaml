@@ -1,0 +1,11 @@
+# dev = the local kind cluster. The catalog is read from the local source server (kind/local-source.sh) because the repositories
+# are not pushed yet; once they are, replace app-config.kind.yaml by app-config.github.yaml (needs GITHUB_TOKEN in the Secret).
+domain: platform-demo.test
+clusterName: platform-local
+config:
+  files: [app-config.yaml, app-config.production.yaml, app-config.kind.yaml]
+caConfigMap: platform-demo-ca
+images:
+  # First release: tag v0.1.0 of platform-demo-backstage, then a pull request sets the released digest here (like every service).
+  # kind/local-source.sh rewrites this block in its staging copy to the image you built locally.
+  backstage: { repository: mladenovskistefan/platform-demo-backstage, tag: 0.1.0, digest: "" }

@@ -14,11 +14,13 @@ Requirements: `docker`, `kind` (0.27+), `kubectl`, `helm` 3.x, `openssl`; about 
 | URL | What |
 |---|---|
 | https://shop.platform-demo.test | the Online Boutique frontend |
-| https://argocd.platform-demo.test | Argo CD (user `admin`; password: `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' \| base64 -d`) |
-| https://grafana.platform-demo.test | Grafana (anonymous Admin, local only) with the 10 service dashboards |
+| https://argocd.platform-demo.test | Argo CD: "Log in via Dex", or the local user `admin` (password: `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' \| base64 -d`) |
+| https://grafana.platform-demo.test | Grafana with the 10 service dashboards; signs in through Dex |
+| https://backstage.platform-demo.test | The developer portal (catalog, docs, Kubernetes, Argo CD, Kyverno, Grafana, network, releases); signs in through Dex |
+| https://dex.platform-demo.test | Dex, the single sign-on provider (GitHub in production, a demo user locally) |
 | https://hubble.platform-demo.test | Hubble UI: live flows, policy verdicts, authentication |
 
-**Hostnames** must resolve to `127.0.0.1`: add `127.0.0.1 shop.platform-demo.test grafana.platform-demo.test argocd.platform-demo.test hubble.platform-demo.test` to `C:\Windows\System32\drivers\etc\hosts` (Administrator) and to WSL `/etc/hosts`. Trust `kind/certs/ca.crt` (Windows: double-click -> Trusted Root Certification Authorities) to remove the certificate warning. HTTPS is mandatory: the frontend's cookies are `Secure`.
+**Hostnames** must resolve to `127.0.0.1`: add `127.0.0.1 shop.platform-demo.test grafana.platform-demo.test argocd.platform-demo.test hubble.platform-demo.test backstage.platform-demo.test dex.platform-demo.test` to `C:\Windows\System32\drivers\etc\hosts` (Administrator) and to WSL `/etc/hosts`. Trust `kind/certs/ca.crt` (Windows: double-click -> Trusted Root Certification Authorities) to remove the certificate warning. HTTPS is mandatory: the frontend's cookies are `Secure`.
 
 ## What `up.sh` does, in order
 
@@ -30,6 +32,20 @@ Requirements: `docker`, `kind` (0.27+), `kubectl`, `helm` 3.x, `openssl`; about 
 6. Namespace `platform-demo` (Pod Security `restricted`, `platform.demo/profile: workload`, created with its labels in one request) and the **DB credentials Secret with a random password** - the only things that must not live in Git. Optionally (when `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` are set) the read-only Docker Hub credential Kyverno uses to verify image signatures: Secret `kyverno/dockerhub-read`.
 7. **Argo CD** (`argo/argo-cd`, values from `../gitops/argocd/values.yaml`).
 8. `kubectl apply -f gitops/bootstrap/root.yaml`: the root Application. From here Argo CD creates the projects, the ApplicationSets, itself (self-management) **Kyverno** and the cluster policies (`../policies/README.md`) and the 14 Applications (12 workloads + `platform-gateway` + `monitoring-local`): 18 Applications in total. See `../gitops/README.md`.
+
+## Single sign-on, the portal, and deploying without pushing
+
+`up.sh` also builds the single sign-on setup (Dex) and the developer portal (Backstage); see `docs/sso-and-portal.md` (rendered in the portal) for the pieces.
+
+| Command | What it does |
+|---|---|
+| `kind/up.sh` | As above, deploying from GitHub `main`. Backstage needs a released image first (the digest in `envs/dev/values/backstage.yaml`), so on a fresh checkout use the next line |
+| `LOCAL_SOURCE=1 kind/up.sh` | Deploys **this working tree**, committed or not, without pushing: `local-source.sh` serves a staged copy as a Git remote over HTTP (on the kind network's gateway address, reachable from pods only), `load-image.sh` loads the locally built `platform-demo-backstage:dev` image into the node, `techdocs-publish.sh` publishes the documentation |
+| `kind/local-source.sh sync` | After a change: restage and let Argo CD pick it up (within two minutes) |
+| `kind/sso-bootstrap.sh` | (Re)create the portal's Argo CD and Grafana tokens |
+| `kind/techdocs-publish.sh` | Re-render and re-publish all documentation |
+
+The demo user is `demo@platform-demo.test`; its password is in `kind/certs/demo-password` (git-ignored).
 
 ## Day-to-day
 

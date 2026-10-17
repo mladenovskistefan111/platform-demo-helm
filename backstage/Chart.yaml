@@ -1,0 +1,8 @@
+apiVersion: v2
+name: backstage
+description: >-
+  The developer portal (Backstage) with its PostgreSQL database, a read-only ServiceAccount for the Kubernetes, Argo CD and
+  Kyverno plugins, and the configuration that signs people in through Dex. Single replica.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

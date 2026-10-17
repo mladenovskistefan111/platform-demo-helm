@@ -1,0 +1,68 @@
+# Dex (https://dexidp.io). Install into the `sso` namespace; clients reach it as https://dex.<domain> (the Gateway terminates TLS
+# for browsers, a CoreDNS rewrite plus the https listener below serves the pods - see kind/README.md, "Single sign-on").
+
+domain: platform-demo.test
+# Must be identical everywhere: it is the `iss` of every token and what the clients fetch /.well-known from.
+issuer: https://dex.platform-demo.test
+
+images:
+  # tag = which version, digest = what actually runs (Kyverno requires a digest). Bump both together.
+  dex: { repository: ghcr.io/dexidp/dex, tag: v2.46.0-distroless, digest: sha256:8ba378a122bf44478f29f9999fc92c658d047ea75f539a4c98af8b6db0da3589 }
+  pullPolicy: IfNotPresent
+
+# Secret with the client secrets and the connector credentials. Never in Git: kind/up.sh creates it
+# (kind/sso-secrets.sh documents every key); on AWS External Secrets fills it.
+secretName: dex-secrets
+# Secret (type kubernetes.io/tls) with the certificate for dex.<domain>; the pods' own trust of the issuer. Created by kind/up.sh.
+tlsSecretName: dex-tls
+
+# Storage of auth requests and tokens. `memory` is fine for one replica on a laptop. For anything that must survive a restart
+# use `kubernetes` (CRDs, needs a ClusterRole that may create them) or a SQL database.
+storage:
+  type: memory
+
+# People sign in with their GitHub account; only members of these organisations may. Their teams come through as
+# groups (`<org>:<team-slug>`). Needs an OAuth App (callback https://dex.<domain>/callback): see README.md.
+github:
+  enabled: false
+  orgs:
+    - name: platform-boutique
+  # Secret keys GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET in `secretName`.
+
+# Built-in demo user for trying single sign-on without GitHub. Never enable it where real people sign in.
+demoUser:
+  enabled: false
+  username: demo
+  email: demo@platform-demo.test
+  userID: 5b21b4e6-77e4-4c1c-9f5f-1b4d0a1a8f01
+  groups: ["platform-boutique:maintainers"]
+  # Secret key DEMO_PASSWORD_HASH (bcrypt) in `secretName`.
+
+# Applications that trust Dex. Each needs its secret in `secretName` under the key named in secretEnv.
+clients:
+  - id: backstage
+    name: Backstage
+    secretEnv: BACKSTAGE_CLIENT_SECRET
+    redirectURIs:
+      - https://backstage.platform-demo.test/api/auth/oidc/handler/frame
+  - id: argocd
+    name: Argo CD
+    secretEnv: ARGOCD_CLIENT_SECRET
+    redirectURIs:
+      - https://argocd.platform-demo.test/auth/callback
+  - id: grafana
+    name: Grafana
+    secretEnv: GRAFANA_CLIENT_SECRET
+    redirectURIs:
+      - https://grafana.platform-demo.test/login/generic_oauth
+
+# How long a login lasts. Applications keep their own session after the code exchange; this bounds token refresh.
+expiry:
+  idTokens: 1h
+  refreshTokens:
+    validIfNotUsedFor: 24h
+    absoluteLifetime: 168h
+
+resources:
+  requests: { cpu: 20m, memory: 32Mi }
+  limits: { memory: 128Mi }

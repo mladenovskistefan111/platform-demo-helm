@@ -6,7 +6,7 @@ metadata:
 spec:
   description: Application workloads and the add-ons they need (gateway routes, monitoring). Namespaced resources only.
   sourceRepos:
-    - https://github.com/mladenovskistefan111/platform-demo-helm.git
+    - https://github.com/platform-boutique/platform-demo-helm.git
   destinations:
     - { name: in-cluster, namespace: platform-demo }
     - { name: in-cluster, namespace: monitoring }

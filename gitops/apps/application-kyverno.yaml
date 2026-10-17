@@ -16,7 +16,7 @@ spec:
         releaseName: kyverno
         valueFiles:
           - $values/gitops/kyverno/values.yaml
-    - repoURL: https://github.com/mladenovskistefan111/platform-demo-helm.git
+    - repoURL: https://github.com/platform-boutique/platform-demo-helm.git
       targetRevision: main
       ref: values
   destination: { name: in-cluster, namespace: kyverno }

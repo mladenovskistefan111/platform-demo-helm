@@ -62,5 +62,5 @@ To try a branch before merging, point every Git reference under `gitops/` (`targ
 ## Notes
 
 - `monitoring-local` is a throw-away, single-replica stack (emptyDir storage, anonymous Grafana admin, no network policies). For real clusters use `../monitoring/`.
-- Cilium itself is installed by `up.sh`, not by Argo CD (Argo CD needs a CNI to exist). Adopting it into GitOps afterwards is possible and listed as a next step in the handoff of the [docs repo](https://github.com/mladenovskistefan111/platform-demo-docs/blob/main/HANDOFF.md).
+- Cilium itself is installed by `up.sh`, not by Argo CD (Argo CD needs a CNI to exist). Adopting it into GitOps afterwards is possible and listed as a next step in the handoff of the [docs repo](https://github.com/platform-boutique/platform-demo-docs/blob/main/HANDOFF.md).
 - Mutual authentication is Beta in Cilium, and the SPIFFE handshake authenticates; it does **not** encrypt the data path (WireGuard/IPsec would, and are not enabled).

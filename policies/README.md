@@ -24,7 +24,7 @@ Scope **workload** = `platform-demo` (strict, enforced). Scope **platform** = `m
 |---|---|---|---|
 | `pd-pod-identity` | Validating | workload | `app.kubernetes.io/name` must be one of the 12 workload names (`identity.workloads`); the pod must run under the ServiceAccount of the same name; the label is immutable on a running pod |
 | `pd-image-source` (+`-platform`) | Validating | both | every container (init, regular, ephemeral) from the scope's repository allow-list (`images.<scope>.repositories`, as `image()` normalises them: `index.docker.io/library/redis`), pinned by digest (except `digestExempt`), never `:latest`/untagged |
-| `pd-verify-images` | ImageValidating | workload | images `mladenovskistefan/*` need a keyless cosign signature (classic tag format) from a GitHub Actions workflow of `mladenovskistefan111/*` - the same issuer and identity regexp the Helm CI gate uses. Admission only, background scan off |
+| `pd-verify-images` | ImageValidating | workload | images `mladenovskistefan/*` need a keyless cosign signature (classic tag format) from a GitHub Actions workflow of `mladenovskistefan111/*` **or `platform-boutique/*`** (images signed before the move to the organisation carry the old owner in their certificate identity, newer ones the new one; both stay valid) - the same issuer and identity regexp the Helm CI gate uses. Admission only, background scan off |
 | `pd-readonly-rootfs` (+`-platform`) | Validating | both | `readOnlyRootFilesystem: true` on every container |
 | `pd-require-resources` (+`-platform`) | Validating | both | cpu+memory requests and a memory limit (no CPU limit: it only throttles) |
 | `pd-require-probes` (+`-platform`) | Validating | both | readiness + liveness probe; pods of Jobs are skipped |

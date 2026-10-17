@@ -65,7 +65,7 @@ verifyImages:
   # Matched against the image string as written in the pod spec (not the normalised index.docker.io/... form).
   glob: mladenovskistefan/*
   issuer: https://token.actions.githubusercontent.com
-  subjectRegExp: '^https://github.com/mladenovskistefan111/[a-z-]+/\.github/workflows/[a-z.-]+@.+$'
+  subjectRegExp: '^https://github.com/(mladenovskistefan111|platform-boutique)/[a-z-]+/\.github/workflows/[a-z.-]+@.+$'
   rekorUrl: https://rekor.sigstore.dev
   # Verification reads manifests from Docker Hub; anonymous pulls are limited (100 / 6 h per IP) and a throttled lookup fails
   # closed. Name of a kubernetes.io/dockerconfigjson Secret in the kyverno namespace holding a read-only Docker Hub token

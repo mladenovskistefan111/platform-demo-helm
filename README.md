@@ -2,7 +2,7 @@
 
 Everything that is deployed: the Helm charts for the platform-demo application (10 services, PostgreSQL, Redis), the Gateway API entry point, a local monitoring stack, and the **GitOps configuration** that makes Argo CD deploy them. This repository is the single source of truth for what runs in each environment; the service repositories only build and publish images.
 
-Context for everything below lives in the [docs repo](https://github.com/mladenovskistefan111/platform-demo-docs): the master [`README.md`](https://github.com/mladenovskistefan111/platform-demo-docs/blob/main/README.md) (architecture, wiring, observability contract, CI/CD model, gotchas) and the session handoff [`HANDOFF.md`](https://github.com/mladenovskistefan111/platform-demo-docs/blob/main/HANDOFF.md).
+Context for everything below lives in the [docs repo](https://github.com/platform-boutique/platform-demo-docs): the master [`README.md`](https://github.com/platform-boutique/platform-demo-docs/blob/main/README.md) (architecture, wiring, observability contract, CI/CD model, gotchas) and the session handoff [`HANDOFF.md`](https://github.com/platform-boutique/platform-demo-docs/blob/main/HANDOFF.md).
 
 > `product-catalog-db` is a **temporary** chart/image for local testing. On AWS the database is RDS and that chart (plus its allow-list entry in `.github/workflows/ci.yaml`) is deleted.
 

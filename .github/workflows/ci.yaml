@@ -127,7 +127,7 @@ jobs:
 
       # The charts that deploy to real clusters must be clean (HIGH/CRITICAL fail the build).
       - name: Trivy config - application and gateway charts
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: config
           scan-ref: rendered
@@ -138,7 +138,7 @@ jobs:
 
       # monitoring-local is a laptop-only chart running stock Grafana images; report, don't block.
       - name: Trivy config - monitoring-local (report only)
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: config
           scan-ref: rendered/monitoring-local.yaml

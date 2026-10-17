@@ -1,0 +1,13 @@
+# Workloads deployed to the dev environment (chart = directory at the repo root).
+- { app: product-catalog-db,       chart: product-catalog-db,       namespace: platform-demo }
+- { app: cart-redis,               chart: cart-redis,               namespace: platform-demo }
+- { app: product-catalog-service,  chart: product-catalog-service,  namespace: platform-demo }
+- { app: cart-service,             chart: cart-service,             namespace: platform-demo }
+- { app: currency-service,         chart: currency-service,         namespace: platform-demo }
+- { app: shipping-service,         chart: shipping-service,         namespace: platform-demo }
+- { app: payment-service,          chart: payment-service,          namespace: platform-demo }
+- { app: email-service,            chart: email-service,            namespace: platform-demo }
+- { app: recommendation-service,   chart: recommendation-service,   namespace: platform-demo }
+- { app: ad-service,               chart: ad-service,               namespace: platform-demo }
+- { app: checkout-service,         chart: checkout-service,         namespace: platform-demo }
+- { app: frontend,                 chart: frontend,                 namespace: platform-demo }

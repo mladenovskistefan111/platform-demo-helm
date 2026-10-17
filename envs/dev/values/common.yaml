@@ -1,0 +1,4 @@
+# Applied to every workload in this environment.
+global:
+  networkPolicy:
+    type: cilium        # CiliumNetworkPolicy with SPIFFE/SPIRE mutual authentication (see platform-common)

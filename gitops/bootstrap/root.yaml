@@ -1,0 +1,33 @@
+# Applied once by hand after `helm install argocd` (see ../README.md). Everything else is created from Git:
+# the root Application syncs gitops/apps, which contains the projects, the ApplicationSets and Argo CD itself.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-admin
+  namespace: argocd
+spec:
+  description: Argo CD itself and the GitOps definitions (projects, ApplicationSets). Cluster-admin by design: keep it small.
+  sourceRepos:
+    - https://github.com/mladenovskistefan111/platform-demo-helm.git
+    - https://argoproj.github.io/argo-helm
+  destinations:
+    - { name: in-cluster, namespace: argocd }
+  clusterResourceWhitelist:
+    - { group: "*", kind: "*" }
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-root
+  namespace: argocd
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: platform-admin
+  source:
+    repoURL: https://github.com/mladenovskistefan111/platform-demo-helm.git
+    targetRevision: main
+    path: gitops/apps
+  destination: { name: in-cluster, namespace: argocd }
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [ServerSideApply=true]

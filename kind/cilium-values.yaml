@@ -1,0 +1,49 @@
+# Cilium for the local kind cluster (chart cilium/cilium 1.20.2).
+image:
+  pullPolicy: IfNotPresent
+ipam:
+  mode: kubernetes
+
+# kube-proxy-free: the API server is reached through the control-plane container, not a Service VIP.
+kubeProxyReplacement: true
+k8sServiceHost: platform-local-control-plane
+k8sServicePort: 6443
+
+# Gateway API served by Cilium (replaces Envoy Gateway). No LoadBalancer on kind -> listeners on the host network.
+gatewayAPI:
+  enabled: true
+  hostNetwork:
+    enabled: true
+
+# Mutual authentication (SPIFFE/SPIRE). Beta in Cilium. In-memory SPIRE storage: lab only, identities are
+# re-issued if the SPIRE server restarts.
+authentication:
+  enabled: true
+  mutual:
+    spire:
+      enabled: true
+      install:
+        enabled: true
+        server:
+          dataStorage:
+            enabled: false
+          # The SPIRE image runs as uid 1000 but the chart mounts a hostPath for the admin socket that
+          # Kubernetes creates as root:root 0755, so the server cannot bind it ("bind: permission denied").
+          # SPIRE 1.15 then hangs instead of exiting with the error. Fix the ownership before it starts.
+          initContainers:
+            - name: fix-socket-dir
+              image: docker.io/library/busybox:1.38.0@sha256:dc2d74b28e4cf8984fa52af1f39bc7c3d9c73760b41a74d629f5d11b1ab28616
+              command: ["sh", "-c", "chown 1000:1000 /tmp/spire-server/private && chmod 0750 /tmp/spire-server/private"]
+              volumeMounts:
+                - { name: spire-server-socket, mountPath: /tmp/spire-server/private }
+
+# Flow visibility, needed to prove what is (not) allowed and authenticated.
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+  ui:
+    enabled: true
+
+operator:
+  replicas: 1

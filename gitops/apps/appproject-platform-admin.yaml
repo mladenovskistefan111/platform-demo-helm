@@ -1,0 +1,15 @@
+# Adopted from gitops/bootstrap/root.yaml so that changes to it are reviewed like everything else.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-admin
+  namespace: argocd
+spec:
+  description: Argo CD itself and the GitOps definitions (projects, ApplicationSets). Cluster-admin by design: keep it small.
+  sourceRepos:
+    - https://github.com/mladenovskistefan111/platform-demo-helm.git
+    - https://argoproj.github.io/argo-helm
+  destinations:
+    - { name: in-cluster, namespace: argocd }
+  clusterResourceWhitelist:
+    - { group: "*", kind: "*" }

@@ -1,0 +1,32 @@
+# Argo CD (chart argo/argo-cd). Used twice: `helm install` at bootstrap, then by gitops/apps/application-argocd.yaml so that
+# Argo CD manages and upgrades itself from this file.
+global:
+  domain: argocd.platform-demo.test
+
+configs:
+  params:
+    # TLS terminates at the Cilium Gateway (see platform-gateway); in-cluster traffic is protected by Cilium.
+    server.insecure: true
+  cm:
+    url: https://argocd.platform-demo.test
+    # Poll Git every 2 minutes (default 3). Webhooks are not reachable from a laptop.
+    timeout.reconciliation: 120s
+  rbac:
+    policy.default: role:readonly   # everyone who is not an admin can look, not change
+
+# Not needed for this setup: no SSO provider, no notification channels.
+dex:
+  enabled: false
+notifications:
+  enabled: false
+
+controller:
+  resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 768Mi } }
+server:
+  resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 384Mi } }
+repoServer:
+  resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 512Mi } }
+applicationSet:
+  resources: { requests: { cpu: 50m, memory: 96Mi }, limits: { memory: 256Mi } }
+redis:
+  resources: { requests: { cpu: 25m, memory: 32Mi }, limits: { memory: 128Mi } }

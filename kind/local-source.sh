@@ -99,8 +99,7 @@ sync_git() {
       "$STAGE/work/envs/dev/values/backstage.yaml"
     echo "profile portal: workloads: ${PROFILE_WORKLOADS:-none}, no Kyverno/policies, no monitoring-local, no shop/grafana routes"
   fi
-  # GitHub login: on as soon as the Dex Secret holds an OAuth App (kind/sso-secrets.sh with GITHUB_OAUTH_CLIENT_ID/SECRET). The demo user
-  # stays on beside it in this local environment as the way back in if the OAuth App is misconfigured. Staged copy only.
+  # GitHub login is the only way in (kind/sso-secrets.sh takes GITHUB_OAUTH_CLIENT_ID/SECRET). Staged copy only.
   if [ -n "$(kubectl -n sso get secret dex-secrets -o jsonpath='{.data.GITHUB_CLIENT_ID}' 2>/dev/null)" ]; then
     sed -i '/^github:/{n;s/enabled: false/enabled: true/}' "$STAGE/work/envs/dev/values/dex.yaml"
     echo "dex: GitHub login enabled (OAuth App found in sso/dex-secrets)"

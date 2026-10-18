@@ -155,12 +155,10 @@ Done. Add this line to the Windows hosts file (C:\\Windows\\System32\\drivers\\e
   127.0.0.1 shop.$DOMAIN grafana.$DOMAIN argocd.$DOMAIN hubble.$DOMAIN backstage.$DOMAIN dex.$DOMAIN
 
   https://shop.$DOMAIN      the shop
-  https://argocd.$DOMAIN    Argo CD      "Log in via Dex", or local user admin
-      admin password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo
+  https://argocd.$DOMAIN    Argo CD      "Log in via Dex" (GitHub); there are no local accounts
   https://grafana.$DOMAIN   Grafana (signs in through Dex)
   https://backstage.$DOMAIN the developer portal (signs in through Dex)
-  https://dex.$DOMAIN       Dex, the single sign-on provider
-      demo user: demo@platform-demo.test   password: cat kind/certs/demo-password
+  https://dex.$DOMAIN       Dex, the single sign-on provider (GitHub is the only way in: no local passwords anywhere)
   https://hubble.$DOMAIN    Hubble UI (flows, drops, authentication)
 
 Kyverno:  kubectl get vpol,ivpol,mpol,gpol      policies and their state

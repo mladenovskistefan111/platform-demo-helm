@@ -17,9 +17,8 @@ secretName: dex-secrets
 tlsSecretName: dex-tls
 
 # Storage of auth requests and tokens: `kubernetes` (custom resources in this namespace; Dex creates the CRDs itself, rbac.yaml
-# grants that) survives restarts. NOT `memory` and not SQLite: Dex v2.46.0 deadlocks on the first refresh token used by the built-in
-# demo user (the local-password connector reads Dex's own storage while the refresh transaction holds the lock: dexidp/dex#4209,
-# fix proposed in #4312, unreleased). The whole of Dex then hangs: no popup, Backstage asks for a login again after every refresh.
+# grants that) survives restarts. Not `memory`: Dex v2.46.0 deadlocked on the first refresh token with it when a local-password
+# connector was in use (dexidp/dex#4209, fix proposed in #4312, unreleased), and an in-memory store loses every session on a restart.
 # A SQL database with a pool larger than 1 would also work.
 storage:
   type: kubernetes
@@ -27,19 +26,10 @@ storage:
 # People sign in with their GitHub account; only members of these organisations may. Their teams come through as
 # groups (`<org>:<team-slug>`). Needs an OAuth App (callback https://dex.<domain>/callback): see README.md.
 github:
-  enabled: false
+  enabled: true
   orgs:
     - name: platform-boutique
   # Secret keys GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET in `secretName`.
-
-# Built-in demo user for trying single sign-on without GitHub. Never enable it where real people sign in.
-demoUser:
-  enabled: false
-  username: demo
-  email: demo@platform-demo.test
-  userID: 5b21b4e6-77e4-4c1c-9f5f-1b4d0a1a8f01
-  groups: ["platform-boutique:maintainers"]
-  # Secret key DEMO_PASSWORD_HASH (bcrypt) in `secretName`.
 
 # Applications that trust Dex. Each needs its secret in `secretName` under the key named in secretEnv.
 clients:

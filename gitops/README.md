@@ -41,7 +41,7 @@ kubectl -n argocd annotate application <name> argocd.argoproj.io/refresh=hard --
 argocd app diff <name> --core        # CLI in "core" mode talks to the cluster directly (set the kubectl namespace to argocd)
 ```
 
-Git is polled every 2 minutes (`timeout.reconciliation: 120s`, `requeueAfterSeconds: 120`); webhooks are not reachable from a laptop. The admin password is in `argocd-initial-admin-secret`; there is no SSO yet (dex and notifications are disabled), and the default policy is read-only for everyone else.
+Git is polled every 2 minutes (`timeout.reconciliation: 120s`, `requeueAfterSeconds: 120`); webhooks are not reachable from a laptop. There are no local accounts (`admin` is disabled): people sign in through the standalone Dex with GitHub (the Dex bundled with Argo CD and notifications are disabled), members of `platform-boutique:maintainers` administer, and the default policy is read-only for everyone else.
 
 ## Secrets
 

@@ -19,7 +19,7 @@ Argo CD and Grafana trust Dex. The portal's own documentation, with the architec
 | Portal chart | `backstage/` (portal, PostgreSQL, read-only RBAC, PVC for the published docs) |
 | Per-environment values | `envs/dev/values/dex.yaml`, `envs/dev/values/backstage.yaml` |
 | Routes | `platform-gateway/values.yaml` (`dex`, `backstage`) |
-| Argo CD login | `gitops/argocd/values.yaml` (`oidc.config`, `accounts.backstage`, RBAC, CA mount) |
+| Argo CD login | `gitops/argocd/values.yaml` (`oidc.config`, `admin.enabled: "false"`, RBAC, CA mount) |
 | Grafana login | `monitoring-local/` (`grafana.sso`), `envs/dev/values/monitoring-local.yaml` |
 | Kyverno | `policies/values.yaml`: `backstage` and `sso` are platform-scope namespaces; image allow-list gained Dex, PostgreSQL and the portal image |
 | Argo CD project | `gitops/apps/appproject-platform.yaml`: destinations `backstage`, `sso` |
@@ -44,17 +44,17 @@ a ConfigMap (`platform-demo-ca`). The issuer is therefore identical for everyone
 | Script | Does |
 |---|---|
 | `kind/up.sh` | Adds the CoreDNS rewrite; calls the scripts below in order |
-| `kind/sso-secrets.sh` | Namespaces, CA ConfigMaps, Dex TLS Secret, random client secrets, the demo user |
+| `kind/sso-secrets.sh` | Namespaces, CA ConfigMaps, Dex TLS Secret, random client secrets |
 | `kind/local-source.sh` | `LOCAL_SOURCE=1`: serves this working tree to Argo CD as a Git remote and the catalog descriptors over HTTP (nothing is pushed) |
 | `kind/load-image.sh` | Puts the locally built portal image into the node |
-| `kind/sso-bootstrap.sh` | Creates the read-only Argo CD account token and Grafana service-account token the portal uses |
+| `kind/sso-bootstrap.sh` | Creates the read-only Grafana service-account token the portal uses |
 | `kind/techdocs-publish.sh` | Renders every repository's docs and copies them into the portal |
 
 !!! warning "Secrets"
-    Nothing secret is in Git. Client secrets, the demo password, tokens and the database password are generated on the machine
-    and stored in cluster Secrets (and `kind/certs/demo-password`, which is git-ignored).
+    Nothing secret is in Git. Client secrets, tokens and the database password are generated on the machine
+    and stored in cluster Secrets. There are no local passwords: Argo CD has no local accounts, Grafana's login form is off and Dex has no demo user.
 
 ## Switching on the real GitHub login
 
-See the portal documentation (*Single sign-on → Going live with GitHub*). In this repository it is two lines in
-`envs/dev/values/dex.yaml` (`github.enabled: true`, `demoUser.enabled: false`) plus the OAuth App's id and secret in the `dex-secrets` Secret.
+See the portal documentation (*Single sign-on → Going live with GitHub*). In this repository `github.enabled: true` is the default
+(`envs/dev/values/dex.yaml`; the chart refuses to render without it), and the OAuth App's id and secret go into the `dex-secrets` Secret.

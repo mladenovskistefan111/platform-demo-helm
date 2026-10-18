@@ -14,10 +14,10 @@ Requirements: `docker`, `kind` (0.27+), `kubectl`, `helm` 3.x, `openssl`; about 
 | URL | What |
 |---|---|
 | https://shop.platform-demo.test | the Online Boutique frontend |
-| https://argocd.platform-demo.test | Argo CD: "Log in via Dex", or the local user `admin` (password: `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' \| base64 -d`) |
+| https://argocd.platform-demo.test | Argo CD: "Log in via Dex" (GitHub); the local `admin` is disabled |
 | https://grafana.platform-demo.test | Grafana with the 10 service dashboards; signs in through Dex |
 | https://backstage.platform-demo.test | The developer portal (catalog, docs, Kubernetes, Argo CD, Kyverno, Grafana, network, releases); signs in through Dex |
-| https://dex.platform-demo.test | Dex, the single sign-on provider (GitHub in production, a demo user locally) |
+| https://dex.platform-demo.test | Dex, the single sign-on provider (GitHub is the only way in) |
 | https://hubble.platform-demo.test | Hubble UI: live flows, policy verdicts, authentication |
 
 **Hostnames** must resolve to `127.0.0.1`: add `127.0.0.1 shop.platform-demo.test grafana.platform-demo.test argocd.platform-demo.test hubble.platform-demo.test backstage.platform-demo.test dex.platform-demo.test` to `C:\Windows\System32\drivers\etc\hosts` (Administrator) and to WSL `/etc/hosts`. Trust `kind/certs/ca.crt` (Windows: double-click -> Trusted Root Certification Authorities) to remove the certificate warning. HTTPS is mandatory: the frontend's cookies are `Secure`.
@@ -46,7 +46,7 @@ Requirements: `docker`, `kind` (0.27+), `kubectl`, `helm` 3.x, `openssl`; about 
 | `kind/sso-bootstrap.sh` | (Re)create the portal's Argo CD and Grafana tokens |
 | `kind/techdocs-publish.sh` | Re-render and re-publish all documentation |
 
-The demo user is `demo@platform-demo.test`; its password is in `kind/certs/demo-password` (git-ignored).
+There are no local passwords: every UI signs in through Dex with GitHub (the OAuth App's id and secret are given to `kind/sso-secrets.sh`).
 
 ## Day-to-day
 

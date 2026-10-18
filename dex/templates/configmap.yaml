@@ -1,3 +1,6 @@
+{{- if not .Values.github.enabled }}
+{{- fail "Dex has no way for people to sign in: set github.enabled: true (and put the GitHub OAuth App's client ID and secret into the Secret)." }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -42,16 +45,6 @@ data:
             {{- toYaml .Values.github.orgs | nindent 12 }}
           # Teams become groups named <org>:<team-slug>
           teamNameField: slug
-    {{- end }}
-    {{- if .Values.demoUser.enabled }}
-    enablePasswordDB: true
-    staticPasswords:
-      - email: {{ .Values.demoUser.email | quote }}
-        hashFromEnv: DEMO_PASSWORD_HASH
-        username: {{ .Values.demoUser.username | quote }}
-        userID: {{ .Values.demoUser.userID | quote }}
-        groups:
-          {{- toYaml .Values.demoUser.groups | nindent 10 }}
     {{- end }}
     staticClients:
       {{- range .Values.clients }}

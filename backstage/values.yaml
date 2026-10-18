@@ -18,7 +18,7 @@ config:
   # kind/local-source.sh uses it in the lean profile to switch the Grafana cards off.
   overlay: {}
 
-# Secret with POSTGRES_PASSWORD, BACKSTAGE_OIDC_CLIENT_SECRET, AUTH_SESSION_SECRET, ARGOCD_AUTH_TOKEN, GRAFANA_TOKEN and
+# Secret with POSTGRES_PASSWORD, BACKSTAGE_OIDC_CLIENT_SECRET, AUTH_SESSION_SECRET, GRAFANA_TOKEN and
 # (production) GITHUB_TOKEN. Never in Git: kind/up.sh and kind/sso-bootstrap.sh create it; on AWS External Secrets fills it.
 secretName: backstage-secrets
 

@@ -24,7 +24,7 @@ Requirements: `docker`, `kind` (0.27+), `kubectl`, `helm` 3.x, `openssl`; about 
 
 1. **kind** cluster `platform-local` (`cluster.yaml`): one node, **no default CNI, no kube-proxy**, host ports 80/443 mapped to 8080/8443 on the node.
 2. **Gateway API CRDs** v1.6.3 (must exist before Cilium starts).
-3. **Cilium 1.20.2** (`cilium-values.yaml`): CNI, eBPF kube-proxy replacement, **Gateway API in host-network mode** (no LoadBalancer on kind; listeners 8080/8443), Hubble (+ UI), **mutual authentication with the bundled SPIRE** (persistent 1 Gi PVC for the SPIRE CA).
+3. **Cilium 1.20.3** (`cilium-values.yaml`): CNI, eBPF kube-proxy replacement, **Gateway API in host-network mode** (no LoadBalancer on kind; listeners 8080/8443), Hubble (+ UI), **mutual authentication with the bundled SPIRE** (persistent 1 Gi PVC for the SPIRE CA).
 4. Waits for SPIRE, then restarts the Cilium operator/agents once so they pick up their SPIFFE identities.
 5. **TLS**: `make-tls.sh` creates a local CA + wildcard certificate -> Secret `gateway-system/platform-tls`.
 6. Namespace `platform-demo` (Pod Security `restricted`, `platform.demo/profile: workload`, created with its labels in one request) and the **DB credentials Secret with a random password** - the only things that must not live in Git. Optionally (when `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` are set) the read-only Docker Hub credential Kyverno uses to verify image signatures: Secret `kyverno/dockerhub-read`.

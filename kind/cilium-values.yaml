@@ -1,4 +1,4 @@
-# Cilium for the local kind cluster (chart cilium/cilium 1.20.2).
+# Cilium for the local kind cluster (chart cilium/cilium 1.20.3).
 image:
   pullPolicy: IfNotPresent
 ipam:

@@ -1,6 +1,6 @@
 # GitOps: how Argo CD deploys this repository
 
-Argo CD (3.5, chart `argo/argo-cd` 10.10.0) watches this repository and reconciles the cluster to it. Nothing is applied by hand except the one-time bootstrap (`../kind/up.sh` does it).
+Argo CD (3.5, chart `argo/argo-cd` 10.10.5) watches this repository and reconciles the cluster to it. Nothing is applied by hand except the one-time bootstrap (`../kind/up.sh` does it).
 
 ## Moving parts
 

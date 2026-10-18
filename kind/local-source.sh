@@ -95,7 +95,7 @@ sync_git() {
     printf 'routes:\n  shop: null\n  grafana: null\n' >>"$STAGE/work/envs/dev/values/platform-gateway.yaml"
     # Grafana is not deployed: hide its cards instead of showing 504s (config overlay of the backstage chart, no image rebuild).
     # Arrays are replaced, not merged, by Backstage's config: the base entries of app.extensions are repeated.
-    sed -i 's|^config:$|config:\n  overlay: { app: { extensions: [ { "page:catalog": { config: { path: / } } }, { "entity-content:argocd/ArgoCdPage": false }, { "entity-card:grafana/alerts": false }, { "entity-card:grafana/dashboards": false }, { "entity-card:grafana/overview-dashboard": false } ] } }|' \
+    sed -i 's|^config:$|config:\n  overlay: { app: { extensions: [ { "page:catalog": { config: { path: / } } }, { "entity-card:grafana/alerts": false }, { "entity-card:grafana/dashboards": false }, { "entity-card:grafana/overview-dashboard": false } ] } }|' \
       "$STAGE/work/envs/dev/values/backstage.yaml"
     echo "profile portal: workloads: ${PROFILE_WORKLOADS:-none}, no Kyverno/policies, no monitoring-local, no shop/grafana routes"
   fi

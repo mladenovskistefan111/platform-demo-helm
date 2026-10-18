@@ -16,7 +16,7 @@
 #      Docker network's gateway, so pods can reach it and nothing else can.
 #
 # Environment: WORKSPACE_DIR (default: three levels above this script), LOCAL_SOURCE_PORT (8099),
-#   BACKSTAGE_IMAGE (default platform-demo-backstage:dev) - its digest is written into the staged values/backstage.yaml.
+#   PROFILE (full | portal, see above), BACKSTAGE_IMAGE (default platform-demo-backstage:dev) - its digest is written into the staged values/backstage.yaml.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
@@ -26,6 +26,10 @@ STAGE="${LOCAL_SOURCE_DIR:-$HOME/.cache/platform-demo/local-source}"
 GITHUB_URL="https://github.com/platform-boutique/platform-demo-helm.git"
 BACKSTAGE_IMAGE="${BACKSTAGE_IMAGE:-platform-demo-backstage:dev}"
 KIND_NETWORK="${KIND_NETWORK:-kind}"
+# PROFILE=full (default) | portal (SSO + Argo CD + Backstage only). Remembered in the staging area so a later
+# `local-source.sh sync` keeps the profile `up.sh` started with.
+PROFILE="${PROFILE:-$(cat "$STAGE/profile" 2>/dev/null || echo full)}"
+mkdir -p "$STAGE"; echo "$PROFILE" >"$STAGE/profile"
 
 bind_ip() {
   docker network inspect "$KIND_NETWORK" --format '{{range .IPAM.Config}}{{println .Gateway}}{{end}}' 2>/dev/null \
@@ -70,6 +74,25 @@ sync_git() {
      | tar --null -T - -cf -) | tar -C "$STAGE/work" -xf -
   # every reference to the GitHub URL points at the local server in the staged copy
   grep -rIl --exclude-dir=.git "$GITHUB_URL" "$STAGE/work" 2>/dev/null | xargs -r sed -i "s#$GITHUB_URL#$URL/git/platform-demo-helm.git#g"
+  # PROFILE=portal: staged copy only (the files in Git stay as they are) - no shop, no monitoring stack, no routes into them.
+  if [ "$PROFILE" = portal ]; then
+    echo '[]' >"$STAGE/work/envs/dev/workloads.yaml"
+    sed -i '/app: monitoring-local/d' "$STAGE/work/envs/dev/addons.yaml"
+    # No admission control while the portal is built: Kyverno and its policies are not deployed (up.sh counts the Applications from this copy).
+    rm -f "$STAGE/work/gitops/apps/application-kyverno.yaml" "$STAGE/work/gitops/apps/application-policies.yaml"
+    printf 'routes:\n  shop: null\n  grafana: null\n' >>"$STAGE/work/envs/dev/values/platform-gateway.yaml"
+    # Grafana is not deployed: hide its cards instead of showing 504s (config overlay of the backstage chart, no image rebuild).
+    # Arrays are replaced, not merged, by Backstage's config: the base entries of app.extensions are repeated.
+    sed -i 's|^config:$|config:\n  overlay: { app: { extensions: [ { "page:catalog": { config: { path: / } } }, { "entity-content:argocd/ArgoCdPage": false }, { "entity-card:grafana/alerts": false }, { "entity-card:grafana/dashboards": false }, { "entity-card:grafana/overview-dashboard": false } ] } }|' \
+      "$STAGE/work/envs/dev/values/backstage.yaml"
+    echo "profile portal: no workloads, no Kyverno/policies, no monitoring-local, no shop/grafana routes"
+  fi
+  # GitHub login: on as soon as the Dex Secret holds an OAuth App (kind/sso-secrets.sh with GITHUB_OAUTH_CLIENT_ID/SECRET). The demo user
+  # stays on beside it in this local environment as the way back in if the OAuth App is misconfigured. Staged copy only.
+  if [ -n "$(kubectl -n sso get secret dex-secrets -o jsonpath='{.data.GITHUB_CLIENT_ID}' 2>/dev/null)" ]; then
+    sed -i '/^github:/{n;s/enabled: false/enabled: true/}' "$STAGE/work/envs/dev/values/dex.yaml"
+    echo "dex: GitHub login enabled (OAuth App found in sso/dex-secrets)"
+  fi
   # the Backstage image built locally (see kind/load-image.sh)
   if digest="$(docker image inspect "$BACKSTAGE_IMAGE" --format '{{.Id}}' 2>/dev/null)" && [ -n "$digest" ]; then
     sed -i -E "s#backstage: \{ repository: mladenovskistefan/platform-demo-backstage, tag: [^,]+, digest: \"[^\"]*\" \}#backstage: { repository: mladenovskistefan/platform-demo-backstage, tag: 0.1.0, digest: \"$digest\" }#" \

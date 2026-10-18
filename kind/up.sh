@@ -10,6 +10,10 @@
 # LOCAL_SOURCE=1 kind/up.sh   deploys from this working tree instead of GitHub (nothing is pushed): kind/local-source.sh serves a
 #                             staged copy over HTTP and Argo CD reads that. Also loads a locally built Backstage image
 #                             (platform-demo-backstage:dev) into the node and publishes the TechDocs into the portal.
+# PROFILE=portal LOCAL_SOURCE=1 kind/up.sh
+#                             lean profile (~3 GB): SSO (Dex), Argo CD and Backstage only. No Kyverno, no shop, no monitoring stack,
+#                             no SPIRE/mutual authentication (the shop is what uses it). Needs LOCAL_SOURCE=1: the profile is applied
+#                             to the staged copy of the repository, the files in Git do not change.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -24,6 +28,13 @@ need() { command -v "$1" >/dev/null || { echo "missing tool: $1" >&2; exit 1; };
 for t in docker kind kubectl helm openssl python3; do need "$t"; done
 LOCAL_SOURCE="${LOCAL_SOURCE:-0}"
 BACKSTAGE_IMAGE="${BACKSTAGE_IMAGE:-platform-demo-backstage:dev}"
+PROFILE="${PROFILE:-full}"
+export PROFILE
+case "$PROFILE" in
+  full) ;;
+  portal) [ "$LOCAL_SOURCE" = 1 ] || { echo "PROFILE=portal needs LOCAL_SOURCE=1 (the profile is applied to the staged copy)" >&2; exit 1; } ;;
+  *) echo "unknown PROFILE '$PROFILE' (full | portal)" >&2; exit 1 ;;
+esac
 
 step "kind cluster '$CLUSTER'"
 kind get clusters 2>/dev/null | grep -qx "$CLUSTER" || kind create cluster --config kind/cluster.yaml
@@ -35,14 +46,18 @@ step "Cilium $CILIUM_VERSION"
 helm repo add cilium https://helm.cilium.io/ >/dev/null 2>&1 || true
 helm repo add argo https://argoproj.github.io/argo-helm >/dev/null 2>&1 || true
 helm repo update >/dev/null
-helm upgrade --install cilium cilium/cilium --version "$CILIUM_VERSION" -n kube-system -f kind/cilium-values.yaml --wait --timeout 10m
+cilium_extra=()
+[ "$PROFILE" = portal ] && cilium_extra+=(--set authentication.enabled=false --set authentication.mutual.spire.enabled=false --set authentication.mutual.spire.install.enabled=false)   # no SPIRE server/agents
+helm upgrade --install cilium cilium/cilium --version "$CILIUM_VERSION" -n kube-system -f kind/cilium-values.yaml "${cilium_extra[@]}" --wait --timeout 10m
 
-step "SPIRE: wait for the server, then restart Cilium so every component picks up its identity"
-kubectl -n cilium-spire rollout status sts/spire-server --timeout=5m
-kubectl -n cilium-spire rollout status ds/spire-agent --timeout=5m
-kubectl -n kube-system rollout restart deploy/cilium-operator ds/cilium >/dev/null
-kubectl -n kube-system rollout status ds/cilium --timeout=5m
-kubectl -n kube-system rollout status deploy/cilium-operator --timeout=5m
+if [ "$PROFILE" != portal ]; then
+  step "SPIRE: wait for the server, then restart Cilium so every component picks up its identity"
+  kubectl -n cilium-spire rollout status sts/spire-server --timeout=5m
+  kubectl -n cilium-spire rollout status ds/spire-agent --timeout=5m
+  kubectl -n kube-system rollout restart deploy/cilium-operator ds/cilium >/dev/null
+  kubectl -n kube-system rollout status ds/cilium --timeout=5m
+  kubectl -n kube-system rollout status deploy/cilium-operator --timeout=5m
+fi
 
 step "CoreDNS: pods resolve dex.$DOMAIN to the Dex Service (the issuer URL is the same for browsers and pods)"
 if ! kubectl -n kube-system get cm coredns -o jsonpath='{.data.Corefile}' | grep -q "dex.$DOMAIN"; then
@@ -75,6 +90,7 @@ else
   ROOT=gitops/bootstrap/root.yaml
 fi
 
+if [ "$PROFILE" != portal ]; then
 step "Namespace platform-demo (Pod Security 'restricted', workload profile) and database credentials (random, never in Git)"
 # Created with its labels in one request: the Kyverno policy pd-namespace-pod-security refuses a workload namespace without them.
 kubectl apply -f - >/dev/null <<NS
@@ -91,6 +107,7 @@ if ! kubectl -n platform-demo get secret product-catalog-db-credentials >/dev/nu
     --from-literal=POSTGRES_DB=product_catalog --from-literal=POSTGRES_USER=catalog_user \
     --from-literal=POSTGRES_PASSWORD="$(openssl rand -hex 16)" >/dev/null
 fi
+fi
 
 if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
   step "Docker Hub read credential for Kyverno image verification (Secret kyverno/dockerhub-read, never in Git)"
@@ -106,17 +123,26 @@ helm upgrade --install argocd argo/argo-cd --version "$ARGOCD_CHART_VERSION" -n 
 step "Root Application (everything else comes from Git)"
 kubectl apply -f "$ROOT"
 
-step "Waiting for Argo CD to deploy and heal every Application (up to 15 min)"
+# root + application-*.yaml + one per entry of envs/*/addons.yaml and workloads.yaml, counted in the source Argo CD reads
+SRC="$(cd "$(dirname "$ROOT")/../.." && pwd)"
+expected=$(( 1 + $(ls "$SRC"/gitops/apps/application-*.yaml | wc -l) + $(cat "$SRC"/envs/*/addons.yaml "$SRC"/envs/*/workloads.yaml | grep -c '^- ') ))
+step "Waiting for Argo CD to deploy and heal every Application ($expected expected, up to 15 min)"
 for _ in $(seq 1 90); do
   total=$(kubectl -n argocd get applications --no-headers 2>/dev/null | wc -l)
   bad=$(kubectl -n argocd get applications --no-headers 2>/dev/null | awk '$2!="Synced" || $3!="Healthy"' | wc -l)
-  [ "$total" -ge 20 ] && [ "$bad" -eq 0 ] && break
+  [ "$total" -ge "$expected" ] && [ "$bad" -eq 0 ] && break
   sleep 10
 done
 kubectl -n argocd get applications
 
 step "Single sign-on: tokens for the portal's read-only accounts in Argo CD and Grafana"
 bash kind/sso-bootstrap.sh
+if [ "$PROFILE" = portal ]; then
+  cat <<MSG
+Lean profile: no Kyverno, no shop (shop.$DOMAIN), no Grafana, no mutual authentication. The Grafana cards and the Kubernetes/Network/Releases/Policies tabs
+of the services stay empty; the portal, the catalog, TechDocs and Argo CD work.
+MSG
+fi
 if [ "$LOCAL_SOURCE" = 1 ]; then
   step "TechDocs: render every repository's documentation and publish it into the portal"
   bash kind/techdocs-publish.sh

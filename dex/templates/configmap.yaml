@@ -9,6 +9,10 @@ data:
     issuer: {{ .Values.issuer }}
     storage:
       type: {{ .Values.storage.type }}
+      {{- if eq .Values.storage.type "kubernetes" }}
+      config:
+        inCluster: true
+      {{- end }}
     web:
       http: 0.0.0.0:5556
       https: 0.0.0.0:5557

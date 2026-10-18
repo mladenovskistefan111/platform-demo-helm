@@ -6,6 +6,7 @@ metadata:
   description: "Helm charts, per-environment values, Argo CD configuration, Kyverno policies and the local kind cluster."
   annotations:
     github.com/project-slug: platform-boutique/platform-demo-helm
+    backstage.io/source-location: url:https://github.com/platform-boutique/platform-demo-helm/tree/main/
     backstage.io/techdocs-ref: dir:.
     argocd/app-selector: app.kubernetes.io/part-of=platform-demo
     backstage.io/kubernetes-namespace: argocd

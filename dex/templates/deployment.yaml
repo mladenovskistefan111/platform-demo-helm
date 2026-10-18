@@ -17,7 +17,13 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
+      {{- if eq .Values.storage.type "kubernetes" }}
+      # Dex keeps its state in custom resources (storage.type kubernetes), so it needs its ServiceAccount token (rbac.yaml).
+      serviceAccountName: dex
+      automountServiceAccountToken: true
+      {{- else }}
       automountServiceAccountToken: false
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001

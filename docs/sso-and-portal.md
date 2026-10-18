@@ -15,7 +15,7 @@ Argo CD and Grafana trust Dex. The portal's own documentation, with the architec
 
 | Piece | Location |
 |---|---|
-| Dex chart | `dex/` (ConfigMap, Deployment, Service; in-memory storage) |
+| Dex chart | `dex/` (ConfigMap, Deployment, Service, RBAC; state in Kubernetes custom resources, not `memory`: see the gotcha in the handoff) |
 | Portal chart | `backstage/` (portal, PostgreSQL, read-only RBAC, PVC for the published docs) |
 | Per-environment values | `envs/dev/values/dex.yaml`, `envs/dev/values/backstage.yaml` |
 | Routes | `platform-gateway/values.yaml` (`dex`, `backstage`) |

@@ -41,6 +41,7 @@ Requirements: `docker`, `kind` (0.27+), `kubectl`, `helm` 3.x, `openssl`; about 
 |---|---|
 | `kind/up.sh` | As above, deploying from GitHub `main`. Backstage needs a released image first (the digest in `envs/dev/values/backstage.yaml`), so on a fresh checkout use the next line |
 | `LOCAL_SOURCE=1 kind/up.sh` | Deploys **this working tree**, committed or not, without pushing: `local-source.sh` serves a staged copy as a Git remote over HTTP (on the kind network's gateway address, reachable from pods only), `load-image.sh` loads the locally built `platform-demo-backstage:dev` image into the node, `techdocs-publish.sh` publishes the documentation |
+| `PROFILE=portal LOCAL_SOURCE=1 kind/up.sh` | **Lean profile**: Dex, Argo CD, Backstage and the Gateway only (5 Applications; no Kyverno, no policies). No shop, no monitoring stack, no SPIRE/mutual authentication (Cilium installed with `authentication.enabled=false`). Applied to the staged copy only; Git is unchanged. The portal's Grafana cards are switched off by a config overlay (`config.overlay` of the `backstage` chart); the Kubernetes/Network/Releases/Policies tabs of the services stay empty. The profile is remembered in `~/.cache/platform-demo/local-source/profile`, so a later `local-source.sh sync` keeps it |
 | `kind/local-source.sh sync` | After a change: restage and let Argo CD pick it up (within two minutes) |
 | `kind/sso-bootstrap.sh` | (Re)create the portal's Argo CD and Grafana tokens |
 | `kind/techdocs-publish.sh` | Re-render and re-publish all documentation |

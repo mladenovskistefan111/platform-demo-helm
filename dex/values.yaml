@@ -16,10 +16,13 @@ secretName: dex-secrets
 # Secret (type kubernetes.io/tls) with the certificate for dex.<domain>; the pods' own trust of the issuer. Created by kind/up.sh.
 tlsSecretName: dex-tls
 
-# Storage of auth requests and tokens. `memory` is fine for one replica on a laptop. For anything that must survive a restart
-# use `kubernetes` (CRDs, needs a ClusterRole that may create them) or a SQL database.
+# Storage of auth requests and tokens: `kubernetes` (custom resources in this namespace; Dex creates the CRDs itself, rbac.yaml
+# grants that) survives restarts. NOT `memory` and not SQLite: Dex v2.46.0 deadlocks on the first refresh token used by the built-in
+# demo user (the local-password connector reads Dex's own storage while the refresh transaction holds the lock: dexidp/dex#4209,
+# fix proposed in #4312, unreleased). The whole of Dex then hangs: no popup, Backstage asks for a login again after every refresh.
+# A SQL database with a pool larger than 1 would also work.
 storage:
-  type: memory
+  type: kubernetes
 
 # People sign in with their GitHub account; only members of these organisations may. Their teams come through as
 # groups (`<org>:<team-slug>`). Needs an OAuth App (callback https://dex.<domain>/callback): see README.md.

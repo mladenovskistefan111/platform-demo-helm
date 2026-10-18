@@ -18,6 +18,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 CERTS="$PWD/certs"
+# Profile of the running environment (full | portal): from PROFILE, else the one `up.sh` / `local-source.sh` remembered.
+PROFILE="${PROFILE:-$(cat "$HOME/.cache/platform-demo/local-source/profile" 2>/dev/null || echo full)}"
 rand() { openssl rand -hex 24; }
 have() { kubectl -n "$1" get secret "$2" >/dev/null 2>&1; }
 val()  { kubectl -n "$1" get secret "$2" -o "jsonpath={.data.$3}" 2>/dev/null | base64 -d 2>/dev/null || true; }
@@ -36,9 +38,11 @@ metadata:
     pod-security.kubernetes.io/warn: restricted
 NS
 done
-for ns in argocd monitoring; do kubectl create ns "$ns" --dry-run=client -o yaml | kubectl apply -f - >/dev/null; done
+# The monitoring namespace (Grafana) only exists in the full profile (PROFILE=portal skips it).
+mon=(); [ "$PROFILE" = portal ] || mon=(monitoring)
+for ns in argocd "${mon[@]}"; do kubectl create ns "$ns" --dry-run=client -o yaml | kubectl apply -f - >/dev/null; done
 
-for ns in argocd monitoring backstage; do
+for ns in argocd "${mon[@]}" backstage; do
   kubectl -n "$ns" create configmap platform-demo-ca --from-file=ca.crt="$CERTS/ca.crt" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 done
 kubectl -n sso create secret tls dex-tls --cert="$CERTS/tls.crt" --key="$CERTS/tls.key" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
@@ -69,9 +73,11 @@ kubectl -n sso create secret generic dex-secrets \
 kubectl -n argocd create secret generic argocd-oidc --from-literal=clientSecret="$A" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 kubectl -n argocd label secret argocd-oidc app.kubernetes.io/part-of=argocd --overwrite >/dev/null
 
-if have monitoring grafana-oidc; then GAP="$(val monitoring grafana-oidc GRAFANA_ADMIN_PASSWORD)"; else GAP="$(rand)"; fi
-kubectl -n monitoring create secret generic grafana-oidc --from-literal=GRAFANA_CLIENT_SECRET="$G" --from-literal=GRAFANA_ADMIN_PASSWORD="$GAP" \
-  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+if [ "$PROFILE" != portal ]; then
+  if have monitoring grafana-oidc; then GAP="$(val monitoring grafana-oidc GRAFANA_ADMIN_PASSWORD)"; else GAP="$(rand)"; fi
+  kubectl -n monitoring create secret generic grafana-oidc --from-literal=GRAFANA_CLIENT_SECRET="$G" --from-literal=GRAFANA_ADMIN_PASSWORD="$GAP" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+fi
 
 if have backstage backstage-secrets; then
   PG="$(val backstage backstage-secrets POSTGRES_PASSWORD)"; SS="$(val backstage backstage-secrets AUTH_SESSION_SECRET)"

@@ -29,6 +29,9 @@ spec:
       labels: {{- include "backstage.labels" (dict "name" "backstage" "root" .) | nindent 8 }}
       annotations:
         checksum/env: {{ include (print $.Template.BasePath "/env.yaml") . | sha256sum | trunc 16 | quote }}
+        {{- with .Values.config.overlay }}
+        checksum/overlay: {{ toYaml . | sha256sum | trunc 16 | quote }}
+        {{- end }}
     spec:
       serviceAccountName: backstage
       # The Kubernetes plugin reads the cluster with this ServiceAccount's token (read-only ClusterRole in rbac.yaml).
@@ -49,6 +52,10 @@ spec:
             {{- range .Values.config.files }}
             - --config
             - {{ . }}
+            {{- end }}
+            {{- if .Values.config.overlay }}
+            - --config
+            - /etc/backstage-overlay/app-config.overlay.yaml
             {{- end }}
           envFrom:
             - configMapRef: { name: backstage-env }
@@ -81,6 +88,9 @@ spec:
             {{- if .Values.caConfigMap }}
             - { name: ca, mountPath: /etc/platform-demo-ca, readOnly: true }
             {{- end }}
+            {{- if .Values.config.overlay }}
+            - { name: overlay, mountPath: /etc/backstage-overlay, readOnly: true }
+            {{- end }}
       volumes:
         - name: data
           persistentVolumeClaim: { claimName: backstage-data }
@@ -89,6 +99,22 @@ spec:
         - name: ca
           configMap: { name: {{ .Values.caConfigMap }} }
         {{- end }}
+        {{- if .Values.config.overlay }}
+        - name: overlay
+          configMap: { name: backstage-config-overlay }
+        {{- end }}
+{{- if .Values.config.overlay }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backstage-config-overlay
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "backstage.labels" (dict "name" "backstage" "root" .) | nindent 4 }}
+data:
+  app-config.overlay.yaml: |
+    {{- toYaml .Values.config.overlay | nindent 4 }}
+{{- end }}
 ---
 apiVersion: v1
 kind: Service

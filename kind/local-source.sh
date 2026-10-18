@@ -30,6 +30,9 @@ KIND_NETWORK="${KIND_NETWORK:-kind}"
 # `local-source.sh sync` keeps the profile `up.sh` started with.
 PROFILE="${PROFILE:-$(cat "$STAGE/profile" 2>/dev/null || echo full)}"
 mkdir -p "$STAGE"; echo "$PROFILE" >"$STAGE/profile"
+# PROFILE_WORKLOADS="currency-service,email-service": which workloads the lean profile deploys (default none). Remembered like the profile.
+PROFILE_WORKLOADS="${PROFILE_WORKLOADS-$(cat "$STAGE/profile-workloads" 2>/dev/null || true)}"
+echo "$PROFILE_WORKLOADS" >"$STAGE/profile-workloads"
 
 bind_ip() {
   docker network inspect "$KIND_NETWORK" --format '{{range .IPAM.Config}}{{println .Gateway}}{{end}}' 2>/dev/null \
@@ -76,7 +79,16 @@ sync_git() {
   grep -rIl --exclude-dir=.git "$GITHUB_URL" "$STAGE/work" 2>/dev/null | xargs -r sed -i "s#$GITHUB_URL#$URL/git/platform-demo-helm.git#g"
   # PROFILE=portal: staged copy only (the files in Git stay as they are) - no shop, no monitoring stack, no routes into them.
   if [ "$PROFILE" = portal ]; then
-    echo '[]' >"$STAGE/work/envs/dev/workloads.yaml"
+    if [ -n "$PROFILE_WORKLOADS" ]; then
+      pat="$(echo "$PROFILE_WORKLOADS" | tr ', ' '||' | sed 's/||*/|/g; s/^|//; s/|$//')"
+      { grep -E "^- \{ app: +($pat)," "$STAGE/work/envs/dev/workloads.yaml" || true; } >"$STAGE/work/envs/dev/workloads.lean"
+      [ -s "$STAGE/work/envs/dev/workloads.lean" ] || { echo "PROFILE_WORKLOADS '$PROFILE_WORKLOADS' matches nothing in envs/dev/workloads.yaml" >&2; exit 1; }
+      mv "$STAGE/work/envs/dev/workloads.lean" "$STAGE/work/envs/dev/workloads.yaml"
+    else
+      echo '[]' >"$STAGE/work/envs/dev/workloads.yaml"
+    fi
+    # No SPIRE in this profile: workloads must not demand mutual authentication (their CiliumNetworkPolicy says "required" by default).
+    printf 'networkPolicy:\n  cilium:\n    authentication: disabled\n' >>"$STAGE/work/envs/dev/values/common.yaml"
     sed -i '/app: monitoring-local/d' "$STAGE/work/envs/dev/addons.yaml"
     # No admission control while the portal is built: Kyverno and its policies are not deployed (up.sh counts the Applications from this copy).
     rm -f "$STAGE/work/gitops/apps/application-kyverno.yaml" "$STAGE/work/gitops/apps/application-policies.yaml"
@@ -85,7 +97,7 @@ sync_git() {
     # Arrays are replaced, not merged, by Backstage's config: the base entries of app.extensions are repeated.
     sed -i 's|^config:$|config:\n  overlay: { app: { extensions: [ { "page:catalog": { config: { path: / } } }, { "entity-content:argocd/ArgoCdPage": false }, { "entity-card:grafana/alerts": false }, { "entity-card:grafana/dashboards": false }, { "entity-card:grafana/overview-dashboard": false } ] } }|' \
       "$STAGE/work/envs/dev/values/backstage.yaml"
-    echo "profile portal: no workloads, no Kyverno/policies, no monitoring-local, no shop/grafana routes"
+    echo "profile portal: workloads: ${PROFILE_WORKLOADS:-none}, no Kyverno/policies, no monitoring-local, no shop/grafana routes"
   fi
   # GitHub login: on as soon as the Dex Secret holds an OAuth App (kind/sso-secrets.sh with GITHUB_OAUTH_CLIENT_ID/SECRET). The demo user
   # stays on beside it in this local environment as the way back in if the OAuth App is misconfigured. Staged copy only.

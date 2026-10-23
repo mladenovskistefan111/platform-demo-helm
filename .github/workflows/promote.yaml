@@ -159,7 +159,7 @@ jobs:
         include: ${{ fromJSON(needs.plan.outputs.items) }}
     permissions: {}
     # Not pinned to a real commit yet: set it to the commit of the merged platform-demo-workflows release that adds gitops-promote.yaml.
-    uses: platform-boutique/platform-demo-workflows/.github/workflows/gitops-promote.yaml@0000000000000000000000000000000000000000 # TODO v3.1.0
+    uses: platform-boutique/platform-demo-workflows/.github/workflows/gitops-promote.yaml@341f641320553ad73969b637ff125466e6b2d99c # v3.1.0
     with:
       app: ${{ matrix.app }}
       env: ${{ inputs.env }}

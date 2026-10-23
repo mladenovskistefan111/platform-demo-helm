@@ -32,7 +32,7 @@ jobs:
       issues: write          # the one issue
       security-events: write # SARIF upload
     # TODO(integrator): re-pin to the platform-demo-workflows release tag that contains scheduled-image-scan.yaml once it is merged and tagged
-    uses: platform-boutique/platform-demo-workflows/.github/workflows/scheduled-image-scan.yaml@e78b20c82e818b2af89224303b8c9ab3943d5b81 # feat/scheduled-scans
+    uses: platform-boutique/platform-demo-workflows/.github/workflows/scheduled-image-scan.yaml@341f641320553ad73969b637ff125466e6b2d99c # v3.1.0
     with:
       include-third-party: ${{ inputs.include-third-party == true }}
       fail-on-findings: ${{ inputs.fail-on-findings == true }}

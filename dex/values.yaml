@@ -1,5 +1,5 @@
-# Dex (https://dexidp.io). Install into the `sso` namespace; browsers and pods both reach it as https://dex.<domain> (the Gateway
-# terminates TLS with a publicly trusted certificate, so the pods need no private CA).
+# Dex (https://dexidp.io). Install into the `sso` namespace. Everybody - browsers and pods - reaches it as https://dex.<domain>: the ALB
+# terminates TLS (public certificate), the Gateway forwards plain HTTP to the Service, Dex speaks HTTP (port 5556).
 
 domain: platform-demo.click
 # Must be identical everywhere: it is the `iss` of every token and what the clients fetch /.well-known from.
@@ -35,25 +35,19 @@ github:
     - name: platform-boutique
   # Secret keys GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET in `secretName`.
 
-# Applications that trust Dex. Each needs its secret in `secretName` under the key named in secretEnv. `enabled: false` leaves a
-# client out (and its secret key is then not needed).
+# Applications that trust Dex (redirect URIs go through `tpl`, so {{ .Values.domain }} works). Each needs its secret in `secretName`
+# under the key named in secretEnv.
 clients:
   - id: backstage
     name: Backstage
     secretEnv: BACKSTAGE_CLIENT_SECRET
     redirectURIs:
-      - https://backstage.platform-demo.click/api/auth/oidc/handler/frame
+      - https://backstage.{{ .Values.domain }}/api/auth/oidc/handler/frame
   - id: argocd
     name: Argo CD
     secretEnv: ARGOCD_CLIENT_SECRET
     redirectURIs:
-      - https://argocd.platform-demo.click/auth/callback
-  - id: grafana
-    name: Grafana
-    enabled: false   # only when Grafana is deployed (then SSM /platform-demo/sso/grafana-client-secret too)
-    secretEnv: GRAFANA_CLIENT_SECRET
-    redirectURIs:
-      - https://grafana.platform-demo.click/login/generic_oauth
+      - https://argocd.{{ .Values.domain }}/auth/callback
 
 # How long a login lasts. Applications keep their own session after the code exchange; this bounds token refresh.
 expiry:

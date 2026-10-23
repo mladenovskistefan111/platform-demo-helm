@@ -1,0 +1,34 @@
+# Everything that must exist before the rest of the platform is synced. Per-environment content (the namespace list) lives in
+# ../envs/<env>/values/cluster-bootstrap.yaml, the same pattern as policies/.
+
+# Namespaces of the cluster. One entry per namespace; this is the ONLY place that decides a namespace's labels.
+#   name         namespace name
+#   podSecurity  Pod Security Admission level to ENFORCE: privileged | baseline | restricted ("" = no label, i.e. privileged).
+#                `warn` is always `restricted`, so a namespace that is not restricted yet is called out in kubectl output.
+#   profile      "workload" turns on Kyverno's strict policy profile + namespace baseline (quota, limits, default-deny); see policies/.
+#   sandbox      true = pods run in gVisor (label platform.demo/sandbox=gvisor, picked up by the Kyverno mutation pd-sandbox-gvisor).
+#                Set false to opt a whole namespace out. Never true for namespaces with host-network, privileged or hostPath pods.
+# Every namespace carries Prune=false,Delete=false: removing an entry (or switching off a layer) must never delete a namespace and with
+# it a PersistentVolumeClaim. Namespaces Terraform already created (argocd, external-secrets) are simply adopted: Argo CD adds the labels.
+namespaces: []
+
+# The RuntimeClass pods use to run in gVisor. The `runsc` handler is registered in containerd by the node image (Terraform).
+# No `scheduling.nodeSelector` (all nodes can run it) and no `overhead` (a webhook that sets runtimeClassName after the built-in
+# RuntimeClass admission has run would otherwise leave pod.spec.overhead unset).
+runtimeClass:
+  enabled: true
+  name: gvisor
+  handler: runsc
+
+# Mutual authentication (SPIFFE/SPIRE) needs one ordering step Helm/Terraform cannot express: Cilium must be restarted once the SPIRE
+# server and agents run, so that every Cilium component fetches its identity. Done by a plain Job (not a hook), so it runs ONCE
+# when this chart is first synced and never again unless its spec changes. Bump `rerun` to force another restart.
+spireRestart:
+  enabled: true
+  rerun: "1"
+  namespace: kube-system           # where the Job and its ServiceAccount live (Kyverno and Pod Security leave kube-system alone)
+  timeout: 15m                     # how long each wait may take (EBS volume for the SPIRE server, node join)
+  image: registry.k8s.io/kubectl:v1.36.5@sha256:0667e3f3e6ef435d7cd4c16684244703ebd67314c17511c2a9f87ea44f6cdf6b
+  resources:
+    requests: { cpu: 10m, memory: 32Mi }
+    limits: { memory: 128Mi }

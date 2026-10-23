@@ -79,7 +79,8 @@ jobs:
           helm template platform-gateway ./platform-gateway > rendered/gateway.yaml
           # Not an environment add-on (its own Argo CD Application, project `secrets`): rendered here so kubeconform checks the ExternalSecrets.
           helm template external-secrets-config ./external-secrets-config > rendered/external-secrets-config.yaml
-          # Every workload and add-on of every environment, rendered the way the ApplicationSets do.
+          # Every workload and add-on of every environment, rendered the way the ApplicationSets do (plus the layers'
+          # single-chart Applications: cluster-bootstrap, platform-network-policies). Fails when an app's namespace is undeclared.
           python3 .github/scripts/render-envs.py rendered
           wc -l rendered/*.yaml
 
@@ -118,7 +119,7 @@ jobs:
           ./kubeconform -strict -summary -kubernetes-version "$KUBERNETES_VERSION" \
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-            rendered/*.yaml gitops/apps/*.yaml gitops/bootstrap/*.yaml
+            rendered/*.yaml gitops/apps/*.yaml gitops/bootstrap/*.yaml gitops/layers/*/*.yaml
 
   # ─── misconfiguration scan ────────────────────────────────────────────────
 

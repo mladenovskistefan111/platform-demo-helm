@@ -1,5 +1,7 @@
-# Applied once by hand after `helm install argocd` (see ../README.md). Everything else is created from Git:
-# the root Application syncs gitops/apps, which contains the projects, the ApplicationSets and Argo CD itself.
+# The ONLY two objects that exist besides Argo CD after `terraform apply`. Terraform creates them from a local chart that mirrors this
+# file; KEEP THE TWO COPIES IDENTICAL (spec of the AppProject and of the Application). Everything else is created from Git:
+# the root Application syncs gitops/apps (AppProjects + one Application per layer), each layer syncs gitops/layers/<layer>.
+# To apply by hand instead:  kubectl apply -f gitops/bootstrap/root.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:

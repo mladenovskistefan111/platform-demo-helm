@@ -1,0 +1,23 @@
+{{- /* Namespaces are created here, first (wave -10), so that everything after them (secrets, policies, apps) finds them with the right labels. */ -}}
+{{- range .Values.namespaces }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .name }}
+  labels:
+    app.kubernetes.io/part-of: platform-demo
+    {{- if .podSecurity }}
+    pod-security.kubernetes.io/enforce: {{ .podSecurity }}
+    pod-security.kubernetes.io/warn: restricted
+    {{- end }}
+    {{- with .profile }}
+    platform.demo/profile: {{ . }}
+    {{- end }}
+    {{- if .sandbox }}
+    platform.demo/sandbox: gvisor
+    {{- end }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+{{- end }}

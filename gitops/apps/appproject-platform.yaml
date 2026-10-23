@@ -3,21 +3,24 @@ kind: AppProject
 metadata:
   name: platform
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
 spec:
-  description: Application workloads and the add-ons they need (gateway routes, monitoring). Namespaced resources only.
+  description: Platform add-ons (Gateway and routes, Dex, Backstage) and the network policy of the platform namespaces. Namespaces are NOT created here (layer bootstrap does that).
   sourceRepos:
     - https://github.com/platform-boutique/platform-demo-helm.git
   destinations:
-    - { name: in-cluster, namespace: platform-demo }
-    - { name: in-cluster, namespace: monitoring }
     - { name: in-cluster, namespace: gateway-system }
-    # HTTPRoutes for Argo CD and Hubble live next to those services
-    - { name: in-cluster, namespace: argocd }
-    - { name: in-cluster, namespace: kube-system }
-    # the developer portal and the single sign-on provider (add-ons dex and backstage)
-    - { name: in-cluster, namespace: backstage }
     - { name: in-cluster, namespace: sso }
+    - { name: in-cluster, namespace: backstage }
+    # HTTPRoutes and network policy live next to the services they belong to
+    - { name: in-cluster, namespace: argocd }
+    - { name: in-cluster, namespace: kube-system }       # route to Hubble UI
+    - { name: in-cluster, namespace: platform-demo }     # route to the shop's frontend
   clusterResourceWhitelist:
-    - { group: "", kind: Namespace }
     - { group: rbac.authorization.k8s.io, kind: ClusterRole }
     - { group: rbac.authorization.k8s.io, kind: ClusterRoleBinding }
+  # An add-on must not rewrite the guardrails Kyverno generates or the namespace's quota.
+  namespaceResourceBlacklist:
+    - { group: "", kind: ResourceQuota }
+    - { group: "", kind: LimitRange }

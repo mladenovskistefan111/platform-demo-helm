@@ -1,10 +1,13 @@
 # Kyverno itself: chart from the Kyverno Helm repo (pinned), values from this repository.
-# The policies Application (application-policies.yaml) needs the CRDs this one installs and retries until they exist.
+# Wave 20 of the security layer: after External Secrets and its configuration are Healthy, i.e. after the Secret kyverno/dockerhub-read
+# exists (the image-signature policy reads Docker Hub with it). The policies (wave 30) need the CRDs this one installs.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: kyverno
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
   finalizers: [resources-finalizer.argocd.argoproj.io]
 spec:
   project: security
@@ -22,7 +25,7 @@ spec:
   destination: { name: in-cluster, namespace: kyverno }
   syncPolicy:
     automated: { prune: true, selfHeal: true }
-    syncOptions: [CreateNamespace=true, ServerSideApply=true]
+    syncOptions: [ServerSideApply=true]     # the namespace comes from cluster-bootstrap
     retry:
       limit: 6
       backoff: { duration: 10s, factor: 2, maxDuration: 3m }

@@ -1,12 +1,20 @@
-# Kyverno 1.19 (chart kyverno/kyverno 3.9.1). Used by gitops/apps/application-kyverno.yaml.
-# Laptop profile: one replica of each controller, small requests. For AWS: 3 admission replicas + PDBs (HA).
+# Kyverno 1.19 (chart kyverno/kyverno 3.9.1). Used by gitops/layers/security/application-kyverno.yaml.
+# EKS profile: two admission replicas (one per node, PDB), one of the other controllers, small requests.
 
 # Only the admission, background and reports controllers are needed. Cleanup policies are not used yet.
 cleanupController:
   enabled: false
 
 admissionController:
-  replicas: 1
+  replicas: 2
+  # The cluster network is an overlay (Cilium VXLAN): pod IPs are not routable in the VPC, so the EKS control plane cannot call a webhook
+  # served by a normal pod. The admission controller therefore listens on the NODE's network, on 9443, a port the node security group
+  # opens from the control plane (4443, 6443, 8443, 9443 and 10250 are). Two replicas need two different nodes (same host port), which
+  # the scheduler enforces; the chart's PDB is on for replicas > 1. Its namespace must not enforce Pod Security (host network).
+  hostNetwork: true
+  dnsPolicy: ClusterFirstWithHostNet
+  webhookServer:
+    port: 9443
   container:
     resources:
       requests: { cpu: 50m, memory: 96Mi }
@@ -55,10 +63,10 @@ features:
 
 config:
   # Namespaces whose objects never reach Kyverno. These run the CNI and SPIRE: a Kyverno outage must not stop them
-  # (webhook deadlock), and they are not ours to police. argocd and monitoring ARE policed.
+  # (webhook deadlock), and they are not ours to police. argocd, backstage and sso are policed (report only), platform-demo enforced.
   webhooks:
     namespaceSelector:
       matchExpressions:
         - key: kubernetes.io/metadata.name
           operator: NotIn
-          values: [kube-system, kube-public, kube-node-lease, cilium-spire, cilium-secrets, local-path-storage, kyverno]
+          values: [kube-system, kube-public, kube-node-lease, cilium-spire, cilium-secrets, kyverno]

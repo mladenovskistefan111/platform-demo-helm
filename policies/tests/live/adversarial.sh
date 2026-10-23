@@ -92,7 +92,14 @@ kubectl -n "$NS" delete rolebinding pd-test-cnp >/dev/null 2>&1; kubectl -n "$NS
 echo "== namespaces"
 chk "workload namespace without Pod Security 'restricted'"      deny  "$(kubectl apply --dry-run=server -f - 2>&1 <<<'{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"sneaky","labels":{"platform.demo/profile":"workload"}}}')" "pd-namespace-pod-security"
 chk "remove the Pod Security label from $NS"                    deny  "$(kubectl label ns "$NS" pod-security.kubernetes.io/enforce- --dry-run=server 2>&1)" "pd-namespace-pod-security"
-chk "ordinary label change on monitoring (must stay possible)"  allow "$(kubectl label ns monitoring pd-test=1 --overwrite --dry-run=server 2>&1)"
+chk "ordinary label change on argocd (must stay possible)"      allow "$(kubectl label ns argocd pd-test=1 --overwrite --dry-run=server 2>&1)"
+
+echo "== gVisor sandbox (mutation by namespace label platform.demo/sandbox=gvisor)"
+rc() { grep -o 'runtimeClassName: [a-z]*' <<<"$1" | head -1; }  # server-side dry-run echoes the mutated pod with -o yaml
+SB=$(pod sb1 checkout-service checkout-service "$GOOD" | kubectl apply --dry-run=server -o yaml -f - 2>&1)
+chk "pod in a labelled namespace gets runtimeClassName gvisor"  allow "$([ "$(rc "$SB")" = "runtimeClassName: gvisor" ] && echo ok || echo "got: $(rc "$SB") $(head -c 120 <<<"$SB")")"
+SB=$(pod sb2 checkout-service checkout-service "$GOOD" | sed 's/^metadata: {/metadata: { annotations: { platform.demo\/sandbox: disabled },/' | kubectl apply --dry-run=server -o yaml -f - 2>&1)
+chk "opt-out annotation keeps the pod out of the sandbox"       allow "$([ -z "$(rc "$SB")" ] && echo ok || echo "got: $(rc "$SB")")"
 
 echo "== break-glass (exec / attach / debug)"
 POD=cart-redis-0

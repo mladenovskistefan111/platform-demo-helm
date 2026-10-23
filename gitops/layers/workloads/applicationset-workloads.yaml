@@ -1,8 +1,11 @@
-# Platform add-ons per environment: the Gateway + routes, Dex and Backstage.
+# One Application per (environment, workload). Adding a workload = one line in envs/<env>/workloads.yaml (its namespace must be declared in
+# envs/<env>/values/cluster-bootstrap.yaml). Promotion = a PR that changes image.digest in envs/<env>/values/<app>.yaml.
+# The whole layer is switched off by `[]` in envs/<env>/workloads.yaml. An entry may carry `cluster: <name>` (default in-cluster) for
+# the day the shop moves to its own cluster.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: platform-addons
+  name: platform-workloads
   namespace: argocd
 spec:
   goTemplate: true
@@ -13,7 +16,7 @@ spec:
         revision: main
         requeueAfterSeconds: 120
         files:
-          - path: "envs/*/addons.yaml"
+          - path: "envs/*/workloads.yaml"
         values:
           env: '{{ index .path.segments 1 }}'
   template:
@@ -22,10 +25,10 @@ spec:
       labels:
         app.kubernetes.io/part-of: platform-demo
         platform.demo/env: '{{ .values.env }}'
-        platform.demo/kind: addon
+        platform.demo/kind: workload
       finalizers: [resources-finalizer.argocd.argoproj.io]
     spec:
-      project: platform
+      project: workloads
       source:
         repoURL: https://github.com/platform-boutique/platform-demo-helm.git
         targetRevision: main
@@ -34,17 +37,13 @@ spec:
           releaseName: '{{ .app }}'
           ignoreMissingValueFiles: true
           valueFiles:
+            - '../envs/{{ .values.env }}/values/common.yaml'
             - '../envs/{{ .values.env }}/values/{{ .app }}.yaml'
-      destination: { name: in-cluster, namespace: '{{ .namespace }}' }
+      destination: { name: '{{ index . "cluster" | default "in-cluster" }}', namespace: '{{ .namespace }}' }
       syncPolicy:
         automated: { prune: true, selfHeal: true }
-        syncOptions: [CreateNamespace=true, ServerSideApply=true]
-        # Third-party stacks: no privileged pods, and anything that would not pass `restricted` is called out (Kyverno
-        # reports the namespace; see policies/README.md).
-        managedNamespaceMetadata:
-          labels:
-            pod-security.kubernetes.io/enforce: baseline
-            pod-security.kubernetes.io/warn: restricted
+        # The namespace (restricted, workload profile, gVisor) is declared in envs/<env>/values/cluster-bootstrap.yaml, not created here.
+        syncOptions: [ServerSideApply=true, PruneLast=true]
         retry:
           limit: 6
           backoff: { duration: 10s, factor: 2, maxDuration: 3m }

@@ -1,4 +1,5 @@
-{{- /* Plain HTTP is only used to redirect to HTTPS (the app's cookies are Secure). */}}
+{{- /* With TLS at the Gateway, plain HTTP only redirects to HTTPS (the applications' cookies are Secure). Behind the ALB the redirect is the ALB's job. */}}
+{{- if .Values.tls.enabled }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -12,7 +13,10 @@ spec:
     - filters:
         - type: RequestRedirect
           requestRedirect: { scheme: https, statusCode: 301 }
+{{- end }}
+{{- $section := ternary "https" "http" .Values.tls.enabled }}
 {{- range $name, $r := .Values.routes }}
+{{- if dig "enabled" true $r }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -21,9 +25,17 @@ metadata:
   namespace: {{ $r.namespace }}
 spec:
   parentRefs:
-    - { name: {{ $.Values.gateway.name }}, namespace: {{ $.Values.gateway.namespace }}, sectionName: https }
+    - { name: {{ $.Values.gateway.name }}, namespace: {{ $.Values.gateway.namespace }}, sectionName: {{ $section }} }
   hostnames: [{{ printf "%s.%s" $r.host $.Values.domain | quote }}]
   rules:
-    - backendRefs:
+    - {{- with $.Values.forwardedProto }}
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            set:
+              - { name: X-Forwarded-Proto, value: {{ . | quote }} }
+      {{- end }}
+      backendRefs:
         - { name: {{ $r.service }}, port: {{ $r.port }} }
+{{- end }}
 {{- end }}

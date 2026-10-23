@@ -1,0 +1,29 @@
+# Default-deny + explicit allow rules for argocd, sso, backstage and gateway-system (chart platform-network-policies/).
+# Wave 0 of the platform layer: the rules exist before the add-ons' pods start. Inside the chart the allow rules are wave 0 and the
+# default-deny wave 1, so Argo CD never loses its own connections while the policy is applied.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-network-policies
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/platform-boutique/platform-demo-helm.git
+    targetRevision: main
+    path: platform-network-policies
+    helm:
+      releaseName: platform-network-policies
+      ignoreMissingValueFiles: true
+      valueFiles:
+        - ../envs/dev/values/platform-network-policies.yaml
+  destination: { name: in-cluster, namespace: argocd }
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [ServerSideApply=true]
+    retry:
+      limit: 6
+      backoff: { duration: 10s, factor: 2, maxDuration: 3m }

@@ -1,10 +1,14 @@
-# One Application per (environment, workload). Adding an environment = adding envs/<name>/; adding a workload = one line in
-# envs/<name>/workloads.yaml. Promotion = a PR that changes image.digest in envs/<name>/values/<app>.yaml.
+# Platform add-ons per environment: Gateway + routes, Dex, Backstage ... one Application per line of envs/<env>/addons.yaml.
+# Wave 10 of the platform layer. (Ordering BETWEEN the generated Applications is not possible - they are created by the controller, not
+# by a sync - so they rely on retries, like the shop does: Dex and Backstage wait for their Secrets, which already exist by now.)
+# An entry may carry `cluster: <name>` to target a cluster other than the one Argo CD runs in (default in-cluster).
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: platform-workloads
+  name: platform-addons
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
 spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
@@ -14,7 +18,7 @@ spec:
         revision: main
         requeueAfterSeconds: 120
         files:
-          - path: "envs/*/workloads.yaml"
+          - path: "envs/*/addons.yaml"
         values:
           env: '{{ index .path.segments 1 }}'
   template:
@@ -23,7 +27,7 @@ spec:
       labels:
         app.kubernetes.io/part-of: platform-demo
         platform.demo/env: '{{ .values.env }}'
-        platform.demo/kind: workload
+        platform.demo/kind: addon
       finalizers: [resources-finalizer.argocd.argoproj.io]
     spec:
       project: platform
@@ -35,16 +39,13 @@ spec:
           releaseName: '{{ .app }}'
           ignoreMissingValueFiles: true
           valueFiles:
-            - '../envs/{{ .values.env }}/values/common.yaml'
             - '../envs/{{ .values.env }}/values/{{ .app }}.yaml'
-      destination: { name: in-cluster, namespace: '{{ .namespace }}' }
+      destination: { name: '{{ index . "cluster" | default "in-cluster" }}', namespace: '{{ .namespace }}' }
       syncPolicy:
         automated: { prune: true, selfHeal: true }
-        syncOptions: [CreateNamespace=true, ServerSideApply=true, PruneLast=true]
-        managedNamespaceMetadata:
-          labels:
-            pod-security.kubernetes.io/enforce: restricted
-            platform.demo/profile: workload     # Kyverno: namespace baseline (quota, limits, default-deny) and the strict policy profile
+        # No CreateNamespace: the namespace (with its Pod Security / sandbox labels) must be declared in envs/<env>/values/cluster-bootstrap.yaml.
+        # An undeclared namespace fails loudly at sync instead of silently appearing unlabelled; CI checks it too.
+        syncOptions: [ServerSideApply=true]
         retry:
           limit: 6
           backoff: { duration: 10s, factor: 2, maxDuration: 3m }

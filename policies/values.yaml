@@ -6,13 +6,13 @@
 defaultAction: Audit
 # Per-policy override, keyed by the policy name without the "pd-" prefix, e.g. { pod-identity: Deny }.
 actions: {}
-# The platform scope (monitoring, argocd) is reported but never enforced unless this is true.
+# The platform scope (argocd, backstage, sso) is reported but never enforced unless this is true.
 enforcePlatform: false
 
 # Namespaces by profile. Policies name them explicitly (not by label) so a namespace cannot opt out by being relabelled.
 scopes:
   workload: [platform-demo]       # our services: the strict profile
-  platform: [monitoring, argocd, backstage, sso]  # third-party stacks and the portal: registry/resources/probes checks, never the identity rules
+  platform: [argocd, backstage, sso]  # third-party stacks and the portal: registry/resources/probes checks, never the identity rules
 
 # Hostnames HTTPRoutes may claim.
 domain: platform-demo.click
@@ -46,12 +46,6 @@ images:
     digestExempt: []
   platform:
     repositories:
-      - index.docker.io/grafana/alloy
-      - index.docker.io/grafana/grafana
-      - index.docker.io/grafana/loki
-      - index.docker.io/grafana/mimir
-      - index.docker.io/grafana/pyroscope
-      - index.docker.io/grafana/tempo
       - ghcr.io/dexidp/dex
       - index.docker.io/mladenovskistefan/platform-demo-backstage
       - quay.io/argoproj/argocd
@@ -71,18 +65,24 @@ verifyImages:
   rekorUrl: https://rekor.sigstore.dev
   # Verification reads manifests from Docker Hub; anonymous pulls are limited (100 / 6 h per IP) and a throttled lookup fails
   # closed. Name of a kubernetes.io/dockerconfigjson Secret in the kyverno namespace holding a read-only Docker Hub token
-  # (created outside Git from the SSM parameters /platform-demo/dockerhub/*; on AWS External Secrets fills it). Empty = anonymous.
-  pullSecret: ""
+  # (External Secrets creates `dockerhub-read` from Parameter Store before Kyverno is installed; gitops/layers/security). Empty = anonymous.
+  pullSecret: dockerhub-read
   # Images that are knowingly unsigned. Each one is a PolicyException in the kyverno namespace (see exceptions.yaml): the pod must
   # carry app.kubernetes.io/name=<name> AND every container must use <imagePrefix>... (spec.images of an exception is not used on purpose).
   unsigned:
     - name: product-catalog-db
       imagePrefix: "mladenovskistefan/product-catalog-db@sha256:"
-      reason: Temporary hand-built image (replaced by RDS); same allow-list entry as in the Helm CI.
+      reason: Temporary hand-built image of the in-cluster PostgreSQL (the shop's database stays in the cluster for now); same allow-list entry as in the Helm CI.
 
 # Who may change network policy and traffic-exposing objects (CiliumNetworkPolicy, NetworkPolicy, Gateway, HTTPRoute) in
 # policed namespaces: Argo CD, Kyverno's own generator, the cluster's housekeeping controllers and cluster admins.
 protectedChanges:
+  # Cluster admins on EKS arrive through access entries, which carry no Kubernetes group: they are recognised by their IAM identity
+  # (regular expressions over the user name EKS gives them: arn:aws:sts::<account>:assumed-role/<role>/<session> or arn:aws:iam::<account>:user/<name>).
+  # Keep in step with admin_role_names / admin_user_names in infra stacks/platform/platform.auto.tfvars.
+  userPatterns:
+    - '^arn:aws:sts::[0-9]+:assumed-role/platform-demo-github-apply/.+$'
+    - '^arn:aws:iam::[0-9]+:user/terraform-platform$'
   users:
     - system:serviceaccount:argocd:argocd-application-controller
     - system:serviceaccount:kyverno:kyverno-background-controller
@@ -92,6 +92,18 @@ protectedChanges:
   groups:
     - system:masters
     - kubeadm:cluster-admins
+
+# gVisor sandbox. Pods in namespaces labelled <namespaceLabel>=<namespaceLabelValue> get `runtimeClassName: <runtimeClassName>` (the
+# RuntimeClass is created by cluster-bootstrap; the label by the same chart's namespace list) unless they already name a runtime class,
+# use the host network/PID/IPC, are privileged, mount a hostPath, or carry the annotation <optOutAnnotation>=disabled.
+# failurePolicy Fail: if Kyverno is down, pods in those namespaces are refused instead of silently starting without the sandbox.
+sandbox:
+  enabled: true
+  runtimeClassName: gvisor
+  namespaceLabel: platform.demo/sandbox
+  namespaceLabelValue: gvisor
+  optOutAnnotation: platform.demo/sandbox
+  failurePolicy: Fail
 
 # kubectl exec / attach / debug into workload pods is refused unless the pod carries this annotation set to "true".
 breakGlass:

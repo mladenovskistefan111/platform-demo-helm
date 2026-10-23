@@ -1,0 +1,21 @@
+# Network policy for the platform namespaces, in one place so that "who may talk to whom" is reviewed together.
+# The shop (platform-demo) is different: Kyverno generates its default-deny, every service chart brings its own allow rules with
+# SPIFFE mutual authentication (platform-common). Platform components talk to the outside world and to each other through the
+# Gateway, so they get plain identity-based rules, no mutual authentication.
+
+# Namespaces that get a default-deny (ingress and egress) policy. Pods there can neither be reached nor reach anything until a rule below allows it.
+defaultDeny: [argocd, sso, backstage, gateway-system]
+
+# The VPC. The Backstage database (RDS) has an address in it; the pod CIDR (10.244.0.0/16) is separate, so this does not open the cluster.
+vpcCidr: 10.0.0.0/16
+databasePort: 5432
+
+# Per-namespace rules; set enabled: false to leave a namespace on default-deny only (or, with defaultDeny, to remove its policies).
+argocd:
+  enabled: true
+  # Other namespaces whose pods may call Argo CD's API in-cluster (the portal's Deployments tab).
+  apiClients: [backstage]
+sso:
+  enabled: true
+backstage:
+  enabled: true

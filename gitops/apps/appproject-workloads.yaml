@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: workloads
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  description: The shop (envs/<env>/workloads.yaml). One namespace, namespaced resources only, no quota or limit changes. Destinations list the clusters it may target.
+  sourceRepos:
+    - https://github.com/platform-boutique/platform-demo-helm.git
+  destinations:
+    - { name: in-cluster, namespace: platform-demo }
+    # A second cluster for the shop: register it in Argo CD, then add
+    #   - { name: <cluster>, namespace: platform-demo }
+  clusterResourceWhitelist: []
+  namespaceResourceBlacklist:
+    - { group: "", kind: ResourceQuota }
+    - { group: "", kind: LimitRange }

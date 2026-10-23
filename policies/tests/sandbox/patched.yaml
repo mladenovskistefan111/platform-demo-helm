@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bare
+  namespace: sandboxed
+  labels: { app.kubernetes.io/name: frontend }
+spec:
+  runtimeClassName: gvisor
+  containers: [{ name: c, image: i }]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: annotation-other-value
+  namespace: sandboxed
+  annotations: { platform.demo/sandbox: "no" }
+spec:
+  runtimeClassName: gvisor
+  containers: [{ name: c, image: i }]

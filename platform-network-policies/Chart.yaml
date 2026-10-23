@@ -1,0 +1,8 @@
+apiVersion: v2
+name: platform-network-policies
+description: >-
+  Default-deny and explicit allow rules (CiliumNetworkPolicy) for the platform namespaces: argocd, sso (Dex), backstage, gateway-system.
+  The shop's namespace gets its default-deny from Kyverno (pd-namespace-baseline) and its allow rules from its own charts.
+type: application
+version: 0.1.0
+appVersion: "1.0"

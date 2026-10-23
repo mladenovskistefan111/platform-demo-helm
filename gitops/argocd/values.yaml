@@ -1,21 +1,25 @@
-# Argo CD (chart argo/argo-cd). Used twice: `helm install` at bootstrap, then by gitops/apps/application-argocd.yaml so that
-# Argo CD manages and upgrades itself from this file.
+# Argo CD (chart argo/argo-cd 10.10.0, the version Terraform installs). Terraform installs it once with a few bootstrap values (it cannot
+# read this file); from then on gitops/layers/platform/application-argocd.yaml makes Argo CD manage and upgrade itself from here.
+# Terraform must set the same `server.insecure` (below), or argocd.platform-demo.click redirects in a loop until this file is synced.
 global:
   domain: argocd.platform-demo.click
 
 configs:
   params:
-    # TLS terminates at the Cilium Gateway (see platform-gateway); in-cluster traffic is protected by Cilium.
+    # TLS terminates at the ALB (Terraform); the Cilium Gateway forwards plain HTTP (port 80 of argocd-server). In-cluster traffic is
+    # encrypted by Cilium (WireGuard). The Gateway sets X-Forwarded-Proto: https on the route, so redirects and cookies are https.
     server.insecure: true
     # Compare against what the API server would produce (dry-run apply) instead of a client-side diff; otherwise
     # Gateway API routes and StatefulSets, whose fields the API server defaults, stay OutOfSync forever.
     controller.diff.server.side: true
   cm:
     url: https://argocd.platform-demo.click
-    # Poll Git every 2 minutes (default 3).
+    # Poll Git every 2 minutes (default 3). A webhook from GitHub could replace this, but the ALB only admits the maintainer's address.
     timeout.reconciliation: 120s
-    # Single sign-on through Dex (platform-demo-helm/dex), the same provider as Backstage and Grafana. People sign in with GitHub;
-    # their teams arrive as groups. The client secret is a Secret labelled part-of=argocd (External Secrets creates it from AWS SSM Parameter Store, never in Git).
+    # Single sign-on through Dex (platform-demo-helm/dex), the same provider as Backstage. People sign in with GitHub; their teams
+    # arrive as groups. The client secret is the Secret `argocd-oidc` (key clientSecret, label app.kubernetes.io/part-of=argocd) in the
+    # argocd namespace, created by External Secrets from Parameter Store, never in Git. Dex is reached at its public URL (ACM certificate,
+    # trusted by the system roots): from the pod that is NAT gateway -> ALB, so the ALB must admit the NAT gateways' addresses.
     oidc.config: |
       name: Dex
       issuer: https://dex.platform-demo.click
@@ -26,7 +30,8 @@ configs:
       # applies its RBAC to that person. Without the second audience Argo CD refuses the token.
       allowedAudiences: [argocd, backstage]
     # No local accounts at all: nobody has a password in Argo CD. The built-in `admin` is switched off, so the only way in is GitHub
-    # through Dex. (If Dex is ever unreachable: cluster-admins can re-enable admin by editing this ConfigMap with kubectl.)
+    # through Dex. Break-glass if Dex is unreachable: `argocd --core ...` with cluster-admin IAM (talks to the cluster directly), or
+    # re-enable admin by editing this ConfigMap with kubectl.
     admin.enabled: "false"
   rbac:
     policy.default: role:readonly   # everyone who is signed in can look, not change

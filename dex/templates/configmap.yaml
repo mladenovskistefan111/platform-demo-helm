@@ -55,6 +55,6 @@ data:
         name: {{ .name | quote }}
         secretEnv: {{ .secretEnv }}
         redirectURIs:
-          {{- toYaml .redirectURIs | nindent 10 }}
+          {{- tpl (toYaml .redirectURIs) $ | nindent 10 }}
       {{- end }}
       {{- end }}

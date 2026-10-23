@@ -11,8 +11,8 @@ external-secrets-config/  ClusterSecretStores and ExternalSecrets (AWS SSM Param
 dex/, backstage/          SSO provider (Dex) and the developer portal (Backstage on RDS); deployed as add-ons from clusters/main/addons.yaml
 monitoring/               vendored upstream charts (unchanged; not deployed yet)
 platform-demo/            umbrella chart: `helm install` of the whole app without Argo CD (values-dev/prod.yaml)
-envs/common.yaml          defaults of every shop application in every environment (mutual authentication, small profile)
-envs/{dev,stage,prod}/    the shop per environment: workloads.yaml (app list + namespace), values/<app>.yaml (image tag + digest, differences)
+envs/common.yaml          only what is identical in every environment (mutual authentication)
+envs/{dev,stage,prod}/    the shop per environment: workloads.yaml (app list + namespace), common.yaml (sizing), values/<app>.yaml (image tag + digest, differences)
 clusters/main/            the platform of the cluster: addons.yaml, values/{cluster-bootstrap (the namespace list),policies,external-secrets-config,platform-gateway,dex,backstage}.yaml
 gitops/                   app-of-apps: bootstrap/root.yaml (Terraform mirrors it), apps/ (AppProjects + one Application per layer), layers/{bootstrap,security,platform,workloads}/ (sync-wave ordered Applications and ApplicationSets), argocd/values.yaml, kyverno/values.yaml
 policies/                 Kyverno policies (CEL policy types) + tests; README explains each policy, rollout, exceptions, break-glass

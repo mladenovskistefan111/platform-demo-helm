@@ -1,8 +1,8 @@
 # The shop: one Application per (environment, workload), named <env>-<app> (dev-frontend, stage-frontend, prod-frontend; the name must be
 # unique across environments and the Backstage plugins split it at the first dash). Adding a workload = one line in
 # envs/<env>/workloads.yaml (its namespace must be declared in clusters/main/values/cluster-bootstrap.yaml). Promotion = a PR that changes
-# image.tag and image.digest in envs/<env>/values/<app>.yaml. Value files, later ones win: envs/common.yaml (defaults of every
-# environment), envs/<env>/values/<app>.yaml (what differs). An environment is switched off by `[]` in its workloads.yaml.
+# image.tag and image.digest in envs/<env>/values/<app>.yaml. Value files, later ones win: envs/common.yaml (only what is identical
+# in every environment), envs/<env>/common.yaml (sizing of the environment), envs/<env>/values/<app>.yaml (per app). An environment is switched off by `[]` in its workloads.yaml.
 # An entry may carry `cluster: <name>` (default in-cluster) for the day the shop moves to its own cluster.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
@@ -40,6 +40,7 @@ spec:
           ignoreMissingValueFiles: true
           valueFiles:
             - '../envs/common.yaml'
+            - '../envs/{{ .values.env }}/common.yaml'
             - '../envs/{{ .values.env }}/values/{{ .app }}.yaml'
       destination: { name: '{{ index . "cluster" | default "in-cluster" }}', namespace: '{{ .namespace }}' }
       syncPolicy:

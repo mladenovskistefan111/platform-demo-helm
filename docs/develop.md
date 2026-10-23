@@ -12,7 +12,7 @@
 
 ```bash
 helm lint <chart>                                            # or loop over */
-helm template <app> <chart> -n dev-platform-demo -f envs/common.yaml -f envs/dev/values/<app>.yaml
+helm template <app> <chart> -n dev-platform-demo -f envs/common.yaml -f envs/dev/common.yaml -f envs/dev/values/<app>.yaml
 python3 .github/scripts/render-envs.py /tmp/rendered         # every shop app of every environment and the platform, as Argo CD renders them, plus the wiring checks
 helm dependency update <chart>                               # after changing platform-common
 ```

@@ -1,0 +1,8 @@
+# Sizing of the PROD shop (applied to every app of the environment, before values/<app>.yaml). Written out explicitly: today production runs
+# the same small profile as dev and stage (one replica, no HPA/PDB/spread). Raising redundancy for production (replicaCount, autoscaling,
+# podDisruptionBudget, topologySpread) is a change to THIS file only; dev and stage cannot be affected.
+replicaCount: 1
+autoscaling: { enabled: false }
+podDisruptionBudget: { enabled: false }
+topologySpread: { enabled: false }
+preStopSleepSeconds: 0

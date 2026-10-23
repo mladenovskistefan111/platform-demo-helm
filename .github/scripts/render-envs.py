@@ -5,7 +5,7 @@ usage: render-envs.py <output-dir>     (run from the repository root, after `hel
 
 Two kinds of things are rendered (see gitops/layers/*/applicationset-*.yaml):
 
-  the shop       envs/<env>/workloads.yaml  ->  value files envs/common.yaml + envs/<env>/values/<app>.yaml
+  the shop       envs/<env>/workloads.yaml  ->  value files envs/common.yaml + envs/<env>/common.yaml + envs/<env>/values/<app>.yaml
                  output: <output-dir>/env-<env>-<app>.yaml          (Argo CD Application <env>-<app>)
   the platform   clusters/<cluster>/addons.yaml  ->  value file clusters/<cluster>/values/<app>.yaml
                  plus the single-chart Applications of the layers that are not list entries (cluster-bootstrap,
@@ -13,7 +13,7 @@ Two kinds of things are rendered (see gitops/layers/*/applicationset-*.yaml):
                  output: <output-dir>/cluster-<cluster>-<app>.yaml  (Argo CD Application <app>)
 
 It also fails (with ::error:: lines) when
-  - a listed chart directory does not exist, or an environment's app name differs from its chart directory name
+  - an environment has no envs/<env>/common.yaml (its sizing), or a listed chart directory does not exist, or an environment's app name differs from its chart directory name
     (the promotion workflows rely on  <app> == chart directory == envs/<env>/values/<app>.yaml);
   - a service image is not set as image.tag + image.digest (sha256:<64 hex>) in envs/<env>/values/<app>.yaml;
   - two environments share a namespace, or two Argo CD Applications would get the same name;
@@ -91,6 +91,8 @@ for env_dir in sorted(glob.glob("envs/*/")):
     path = os.path.join(env_dir, "workloads.yaml")
     if not os.path.exists(path):
         continue
+    if not os.path.exists(f"envs/{env}/common.yaml"):
+        error(f"envs/{env}/common.yaml is missing: without it the environment would silently get the charts' HA defaults")
     for entry in load(path) or []:
         app, chart, namespace = entry["app"], entry["chart"], entry["namespace"]
         env_namespaces.setdefault(env, {}).setdefault(namespace, []).append(app)
@@ -101,7 +103,7 @@ for env_dir in sorted(glob.glob("envs/*/")):
             error(f"{path}: chart directory '{chart}' for app '{app}' does not exist")
             continue
         value_file = f"envs/{env}/values/{app}.yaml"
-        helm_template(app, chart, namespace, ["envs/common.yaml", value_file], f"env-{env}-{app}.yaml", f"{env}/{app}")
+        helm_template(app, chart, namespace, ["envs/common.yaml", f"envs/{env}/common.yaml", value_file], f"env-{env}-{app}.yaml", f"{env}/{app}")
 
         # Contract with the promotion workflows: our own service images are set as image.tag + image.digest in the app's env file.
         defaults = (load(f"{chart}/values.yaml") or {}).get("image", {})

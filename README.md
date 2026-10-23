@@ -20,7 +20,7 @@ platform-demo-helm  (this repo, main)  <--- Argo CD polls --- app-of-apps layers
 ```
 
 - **Charts** (`<service>/`, `platform-common/`, `platform-gateway/`, `dex/`, `backstage/`, `cluster-bootstrap/`, `platform-network-policies/`, `external-secrets-config/`) describe *how* something is deployed.
-- **`envs/<env>/`** (`dev`, `stage`, `prod`) is the shop only, three environments on one cluster: `workloads.yaml` (the app list) and `values/<app>.yaml` (image tag + digest, per-env settings); `envs/common.yaml` holds the defaults every environment shares. **Promotion = a pull request that changes a digest.**
+- **`envs/<env>/`** (`dev`, `stage`, `prod`) is the shop only, three environments on one cluster: `workloads.yaml` (the app list) and `values/<app>.yaml` (image tag + digest, per-env settings); `envs/common.yaml` holds only what is identical in every environment (mutual authentication); `envs/<env>/common.yaml` is the sizing of that environment (replicas, HPA/PDB). **Promotion = a pull request that changes a digest.**
 - **`clusters/<cluster>/`** (`main` today) is everything that is not the shop: `addons.yaml` (Gateway, Dex, Backstage) and `values/<name>.yaml` for those and for the cluster-wide charts (cluster-bootstrap incl. the namespace list, policies, external-secrets-config). A later management/app cluster split adds a directory here.
 - **`gitops/`** is Argo CD's own configuration: install values, the root Application, projects, the two ApplicationSets and the Kyverno Applications. See [`gitops/README.md`](gitops/README.md).
 - **`policies/`** are the Kyverno admission policies (identity, images and signatures, pod hardening, exposure, break-glass, namespace baseline). See [`policies/README.md`](policies/README.md).
@@ -38,8 +38,8 @@ external-secrets-config/  ClusterSecretStores and ExternalSecrets (AWS SSM Param
 dex/, backstage/          SSO provider (Dex) and the developer portal (Backstage on RDS); deployed as add-ons from clusters/main/addons.yaml
 monitoring/               vendored upstream charts (unchanged; not deployed yet)
 platform-demo/            umbrella chart: `helm install` of the whole app without Argo CD (values-dev/prod.yaml)
-envs/common.yaml          defaults of every shop application in every environment (mutual authentication, small profile)
-envs/{dev,stage,prod}/    the shop per environment: workloads.yaml (app list + namespace), values/<app>.yaml (image tag + digest, differences)
+envs/common.yaml          only what is identical in every environment (mutual authentication)
+envs/{dev,stage,prod}/    the shop per environment: workloads.yaml (app list + namespace), common.yaml (sizing), values/<app>.yaml (image tag + digest, differences)
 clusters/main/            the platform of the cluster: addons.yaml, values/{cluster-bootstrap (the namespace list),policies,external-secrets-config,platform-gateway,dex,backstage}.yaml
 gitops/                   app-of-apps: bootstrap/root.yaml (Terraform mirrors it), apps/ (AppProjects + one Application per layer), layers/{bootstrap,security,platform,workloads}/ (sync-wave ordered Applications and ApplicationSets), argocd/values.yaml, kyverno/values.yaml
 policies/                 Kyverno policies (CEL policy types) + tests; README explains each policy, rollout, exceptions, break-glass
@@ -127,7 +127,7 @@ Resource names equal the chart names on purpose: they are the DNS names the serv
 
 ```bash
 helm lint <chart>                                            # or loop over */
-helm template <app> <chart> -n dev-platform-demo -f envs/common.yaml -f envs/dev/values/<app>.yaml
+helm template <app> <chart> -n dev-platform-demo -f envs/common.yaml -f envs/dev/common.yaml -f envs/dev/values/<app>.yaml
 python3 .github/scripts/render-envs.py /tmp/rendered         # every app of every environment and the platform, as Argo CD renders them, plus the wiring checks
 helm dependency update <chart>                               # after changing platform-common
 ```

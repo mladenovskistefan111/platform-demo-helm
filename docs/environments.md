@@ -10,10 +10,11 @@ the Gateway, External Secrets, ...) exists once, in namespaces without a prefix,
 | Argo CD Applications | `prod-<app>` | `stage-<app>` | `dev-<app>` |
 | Host | `shop.platform-demo.click` | `stage.shop.platform-demo.click` | `dev.shop.platform-demo.click` |
 | Database password (SSM) | `/platform-demo/product-catalog-db/postgres-password` | `/platform-demo/stage/product-catalog-db/postgres-password` | `/platform-demo/dev/product-catalog-db/postgres-password` |
-| Size | one replica per service, no HPA/PDB (`envs/common.yaml`) | same | same |
+| Size | one replica per service, no HPA/PDB (`envs/prod/common.yaml`, written out explicitly) | one replica (`envs/stage/common.yaml`) | one replica (`envs/dev/common.yaml`) |
 
 ```
-envs/common.yaml              defaults of every shop application in every environment
+envs/common.yaml              only what is identical in every environment (mutual authentication)
+envs/<env>/common.yaml        sizing of the environment: replicas, HPA, PDB, topology spread
 envs/<env>/workloads.yaml     the app list: { app, chart, namespace }   (app == chart directory name)
 envs/<env>/values/<app>.yaml  what differs: image.tag + image.digest, plus app-specific settings
 clusters/main/addons.yaml     the platform's own apps (Gateway, Dex, Backstage)
@@ -52,7 +53,7 @@ not `sha256:<64 hex>`, and CI verifies the cosign signature of every digest.
 - **Secrets:** one ExternalSecret per namespace, each reading its own Parameter Store entry (`shop.environments` in `external-secrets-config/values.yaml`).
 - **Argo CD:** the `workloads` project lists the three namespaces as destinations; the `platform` project may create the HTTPRoutes in them; `secrets` the ExternalSecrets.
 - **Shared on purpose:** the node pool, the Gateway, the Kyverno cluster policies, the namespace quota (each namespace gets its own).
-  `envs/common.yaml` is one file for all three environments: a change there reaches prod as well.
+  `envs/common.yaml` is one file for all three environments (a change there reaches prod as well), which is why it holds nothing that may differ; sizing is per environment, so a production HA change touches `envs/prod/common.yaml` only.
 
 ## Add an app to the shop
 
@@ -67,7 +68,7 @@ entry in `clusters/main/values/cluster-bootstrap.yaml`.
 
 ## Add an environment (say `qa`)
 
-1. `envs/qa/workloads.yaml` (copy of another environment, namespace `qa-platform-demo`) and `envs/qa/values/` (copy; set the digests you want).
+1. `envs/qa/workloads.yaml` (copy of another environment, namespace `qa-platform-demo`), `envs/qa/common.yaml` (sizing) and `envs/qa/values/` (copy; set the digests you want).
 2. The namespace in `clusters/main/values/cluster-bootstrap.yaml` with the same labels as the other shop namespaces.
 3. `policies/values.yaml`: the namespace in `scopes.workload`.
 4. `external-secrets-config/values.yaml`: the namespace in `allowedNamespaces` and an entry in `shop.environments` with its own `passwordPath`

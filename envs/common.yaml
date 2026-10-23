@@ -1,5 +1,6 @@
-# Defaults for EVERY shop application in EVERY environment (dev, stage, prod). Argo CD and render-envs.py pass this file first, then
-# envs/<env>/values/<app>.yaml, so a per-env file only needs to hold what differs. A change here reaches all three environments at once.
+# Settings that are IDENTICAL in every environment (dev, stage, prod) and nothing else. Value files, later ones win: this file, then
+# envs/<env>/common.yaml (sizing profile of the environment), then envs/<env>/values/<app>.yaml. A change here reaches all three
+# environments at once, prod included, so anything that may ever differ per environment belongs in envs/<env>/common.yaml.
 global:
   networkPolicy:
     type: cilium        # CiliumNetworkPolicy with SPIFFE/SPIRE mutual authentication (see platform-common)
@@ -9,14 +10,3 @@ global:
 networkPolicy:
   cilium:
     authentication: required
-
-# Small profile (same as platform-demo/values-dev.yaml): one replica, no HPA/PDB/spread (two Spot nodes, one namespace quota).
-# This is what production runs today as well, so all three environments share it. With one replica nothing needs an HPA or a PDB
-# (a PDB with minAvailable 1 on one replica would block node drains). When production gets real redundancy, set replicaCount,
-# autoscaling, podDisruptionBudget and topologySpread in envs/prod/values/<app>.yaml (or add envs/prod/common.yaml to the
-# ApplicationSet's valueFiles), never here: dev and stage must stay at one replica.
-replicaCount: 1
-autoscaling: { enabled: false }
-podDisruptionBudget: { enabled: false }
-topologySpread: { enabled: false }
-preStopSleepSeconds: 0

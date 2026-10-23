@@ -1,0 +1,58 @@
+name: Scheduled scans
+
+# Every Monday 08:00 UTC: CVE scan of every image digest that envs/<env>/values/<app>.yaml deploys (dev, stage, prod), by the shared
+# workflow. Results: the Security tab (SARIF, one category per image and environment), the run summary, and ONE issue "Scheduled image scan"
+# (label security-scan) that is updated in place and closed when clean. The run is green on findings; read the issue.
+# Needs the secrets DOCKERHUB_USERNAME / DOCKERHUB_TOKEN (READ-ONLY Docker Hub token; it only lifts the anonymous pull limit).
+# Nothing runs on a plain push or pull request.
+on:
+  schedule:
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+    inputs:
+      include-third-party:
+        description: Also scan the images that are not ours (Dex, ...)
+        type: boolean
+        default: false
+      fail-on-findings:
+        description: Make the run red when there are findings
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: scheduled-scans
+  cancel-in-progress: false
+
+jobs:
+  images:
+    permissions:
+      contents: read
+      issues: write          # the one issue
+      security-events: write # SARIF upload
+    uses: platform-boutique/platform-demo-workflows/.github/workflows/scheduled-image-scan.yaml@341f641320553ad73969b637ff125466e6b2d99c # v3.1.0
+    with:
+      include-third-party: ${{ inputs.include-third-party == true }}
+      fail-on-findings: ${{ inputs.fail-on-findings == true }}
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  # GitHub switches scheduled workflows of a public repository off after 60 days without repository activity. Enabling the workflow
+  # through the API every week is a no-op that (reportedly; GitHub does not promise it) restarts that clock. If it ever stops working
+  # the owner gets GitHub's "scheduled workflow disabled" email and re-enables it in the Actions tab.
+  keepalive:
+    name: Keep the schedule enabled
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Enable this workflow (no-op when it is enabled)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow enable scheduled-scans.yaml

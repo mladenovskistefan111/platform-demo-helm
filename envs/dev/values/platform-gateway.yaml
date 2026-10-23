@@ -1,4 +1,6 @@
-# kind: Cilium host-network Gateway, listeners on 8080/8443 published as 80/443 by kind/cluster.yaml
+# EKS: Cilium runs the Gateway in host-network mode, so listener ports must be > 1023. The Terraform-managed ALB (TLS ends there)
+# forwards to the nodes' port 8080 (gateway_port in infra-terraform, docs/alb-and-gateway.md).
+# TODO(platform-gateway): the https listener (8443 + certificate Secret) is not used behind the ALB and should become optional.
 listeners:
   http: 8080
   https: 8443

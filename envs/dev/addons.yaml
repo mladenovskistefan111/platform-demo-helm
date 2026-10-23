@@ -1,4 +1,3 @@
 - { app: platform-gateway, chart: platform-gateway, namespace: gateway-system }
-- { app: monitoring-local, chart: monitoring-local, namespace: monitoring }
 - { app: dex,                 chart: dex,                 namespace: sso }
 - { app: backstage,           chart: backstage,           namespace: backstage }

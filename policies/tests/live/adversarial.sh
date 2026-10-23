@@ -77,7 +77,7 @@ spec:
 EOF
 }
 chk "HTTPRoute for a foreign host"                              deny  "$(route bank.example.com | dry)" "pd-restrict-route-hostnames"
-chk "HTTPRoute for our domain"                                  allow "$(route shop2.platform-demo.test | dry)"
+chk "HTTPRoute for our domain"                                  allow "$(route shop2.platform-demo.click | dry)"
 kubectl -n "$NS" create role pd-test-cnp --verb='*' --resource=ciliumnetworkpolicies.cilium.io >/dev/null 2>&1
 kubectl -n "$NS" create rolebinding pd-test-cnp --role=pd-test-cnp --user=mallory >/dev/null 2>&1
 CNP="apiVersion: cilium.io/v2

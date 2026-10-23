@@ -1,6 +1,6 @@
 # GitOps: how Argo CD deploys this repository
 
-Argo CD (3.5, chart `argo/argo-cd` 10.10.0) watches this repository and reconciles the cluster to it. Nothing is applied by hand except the one-time bootstrap (`../kind/up.sh` does it).
+Argo CD (3.5, chart `argo/argo-cd` 10.10.0) watches this repository and reconciles the cluster to it. Nothing is applied by hand except the one-time bootstrap (install Argo CD with `argocd/values.yaml`, then apply `bootstrap/root.yaml`).
 
 ## Moving parts
 
@@ -31,7 +31,7 @@ Application names are `<env>-<app>` (`dev-checkout-service`); `kyverno` and `dev
 
 ## Namespace labels
 
-Argo CD creates the namespaces (`managedNamespaceMetadata`): workload namespaces get Pod Security `restricted` and `platform.demo/profile: workload` (the label Kyverno's namespace baseline and the strict policy profile key on); add-on namespaces (`monitoring`, `gateway-system`) and `argocd` get Pod Security `enforce: baseline` + `warn: restricted`. `kind/up.sh` creates `platform-demo` with the same labels in one request because the Kyverno policy `pd-namespace-pod-security` refuses a workload namespace without them.
+Argo CD creates the namespaces (`managedNamespaceMetadata`): workload namespaces get Pod Security `restricted` and `platform.demo/profile: workload` (the label Kyverno's namespace baseline and the strict policy profile key on); add-on namespaces (`monitoring`, `gateway-system`) and `argocd` get Pod Security `enforce: baseline` + `warn: restricted`. A namespace created outside Argo CD must carry the same labels in the request that creates it, because the Kyverno policy `pd-namespace-pod-security` refuses a workload namespace without them.
 
 ## Operating
 
@@ -41,11 +41,11 @@ kubectl -n argocd annotate application <name> argocd.argoproj.io/refresh=hard --
 argocd app diff <name> --core        # CLI in "core" mode talks to the cluster directly (set the kubectl namespace to argocd)
 ```
 
-Git is polled every 2 minutes (`timeout.reconciliation: 120s`, `requeueAfterSeconds: 120`); webhooks are not reachable from a laptop. There are no local accounts (`admin` is disabled): people sign in through the standalone Dex with GitHub (the Dex bundled with Argo CD and notifications are disabled), members of `platform-boutique:maintainers` administer, and the default policy is read-only for everyone else.
+Git is polled every 2 minutes (`timeout.reconciliation: 120s`, `requeueAfterSeconds: 120`). There are no local accounts (`admin` is disabled): people sign in through the standalone Dex with GitHub (the Dex bundled with Argo CD and notifications are disabled), members of `platform-boutique:maintainers` administer, and the default policy is read-only for everyone else.
 
 ## Secrets
 
-Git holds no secrets. The DB credentials Secret and the Gateway TLS Secret are created by `kind/up.sh`. For AWS: External Secrets or Sealed Secrets, and cert-manager (see the handoff in the [docs repo](https://github.com/platform-boutique/platform-demo-docs/blob/main/HANDOFF.md)).
+Git holds no secrets. Secrets come from AWS SSM Parameter Store through External Secrets, and the Gateway TLS Secret from cert-manager (see the handoff in the [docs repo](https://github.com/platform-boutique/platform-demo-docs/blob/main/HANDOFF.md)).
 
 ## Branch testing and `targetRevision`
 

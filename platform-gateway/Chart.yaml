@@ -3,7 +3,7 @@ name: platform-gateway
 description: >-
   Gateway API entry point for platform-demo on Cilium's Gateway API implementation: one Gateway (HTTP redirecting to
   HTTPS) and HTTPRoutes for the shop, Grafana, Argo CD and Hubble. Requires Cilium with gatewayAPI.enabled, the Gateway API
-  CRDs and a TLS Secret (see ../kind/README.md).
+  CRDs and a TLS Secret (cert-manager on AWS).
 type: application
 version: 0.2.0
 appVersion: "1.0"

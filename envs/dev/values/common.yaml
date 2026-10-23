@@ -3,7 +3,7 @@ global:
   networkPolicy:
     type: cilium        # CiliumNetworkPolicy with SPIFFE/SPIRE mutual authentication (see platform-common)
 
-# Laptop profile (same as platform-demo/values-dev.yaml): one replica, no HPA/PDB/spread.
+# Small profile (same as platform-demo/values-dev.yaml): one replica, no HPA/PDB/spread. Revisit for EKS (metrics-server, node count).
 replicaCount: 1
 autoscaling: { enabled: false }
 podDisruptionBudget: { enabled: false }

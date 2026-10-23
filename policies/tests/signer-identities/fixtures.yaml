@@ -1,0 +1,51 @@
+# Who may sign our images (verifyImages.signers in policies/values.yaml). Run by .github/scripts/signer-identities.py test, which
+# evaluates the REAL rendered pd-verify-images policy and the regexp the Helm CI gate builds from the same list against these
+# certificate identities (the "Subject" a keyless cosign signature carries). Not a Kyverno CLI test: the CLI cannot verify
+# signatures offline, and no signature from a workflow that does not exist yet can be made up.
+#
+# `allowed` entries marked "real" were read from signatures on Docker Hub (cosign verify, 2026-10-23); the rest document a form.
+allowed:
+  # service-publish: the flat publish workflow of every app repository (new images)
+  - https://github.com/platform-boutique/platform-demo-workflows/.github/workflows/service-publish.yaml@341f641320553ad73969b637ff125466e6b2d99c
+  # docker-promote, previous generation, real: checkout-service sha-d016e02 (dev, stage) and the developer portal 0.1.1
+  - https://github.com/platform-boutique/platform-demo-workflows/.github/workflows/docker-promote.yaml@341f641320553ad73969b637ff125466e6b2d99c
+  - https://github.com/platform-boutique/platform-demo-workflows/.github/workflows/docker-promote.yaml@aa79eb7ad5f2d7146190e7c61d5de715ce0e42e8
+  # docker-promote under the old owner, real: the v1.0.0 releases (stage, prod)
+  - https://github.com/mladenovskistefan111/platform-demo-workflows/.github/workflows/docker-promote.yaml@87fca0e809f6ba84b782bc2fb2cc1d740b3c877f
+  # per-repository ci-main.yaml, real: the umbrella chart's default values
+  - https://github.com/mladenovskistefan111/ad-service/.github/workflows/ci-main.yaml@refs/heads/feat/otlp-grpc-telemetry
+  - https://github.com/mladenovskistefan111/frontend/.github/workflows/ci-main.yaml@refs/heads/feat/otlp-grpc-telemetry
+  - https://github.com/mladenovskistefan111/product-catalog-service/.github/workflows/ci-main.yaml@refs/heads/feat/otlp-grpc-telemetry
+
+refused:
+  # a foreign repository / owner, whatever the workflow file is called
+  - https://github.com/evil/platform-demo-workflows/.github/workflows/service-publish.yaml@341f641320553ad73969b637ff125466e6b2d99c
+  - https://github.com/mladenovskistefan111/platform-demo-workflows/.github/workflows/service-publish.yaml@341f641320553ad73969b637ff125466e6b2d99c
+  - https://github.com/platform-boutique/some-other-repo/.github/workflows/service-publish.yaml@341f641320553ad73969b637ff125466e6b2d99c
+  - https://github.com/platform-boutique/some-other-repo/.github/workflows/docker-promote.yaml@341f641320553ad73969b637ff125466e6b2d99c
+  - https://github.com/evil/ad-service/.github/workflows/ci-main.yaml@refs/heads/feat/otlp-grpc-telemetry
+  # look-alikes of the repository, the owner and the host
+  - https://github.com/platform-boutique/platform-demo-workflows-evil/.github/workflows/service-publish.yaml@341f641320553ad73969b637ff125466e6b2d99c
+  - https://github.com/platform-boutiquex/platform-demo-workflows/.github/workflows/service-publish.yaml@341f641320553ad73969b637ff125466e6b2d99c
+  - https://github-com/platform-boutique/platform-demo-workflows/.github/workflows/service-publish.yaml@341f641320553ad73969b637ff125466e6b2d99c
+  - https://evil.example/https://github.com/platform-boutique/platform-demo-workflows/.github/workflows/service-publish.yaml@341f641320553ad73969b637ff125466e6b2d99c
+  - https://github.com/platform-boutique/platform-demo-workflows/.github/workflows/service-publish.yaml@341f641320553ad73969b637ff125466e6b2d99c/x
+  # another workflow file of the right repository (CI, secret scan, ...: they never publish)
+  - https://github.com/platform-boutique/platform-demo-workflows/.github/workflows/ci.yaml@341f641320553ad73969b637ff125466e6b2d99c
+  - https://github.com/platform-boutique/platform-demo-workflows/.github/workflows/service-ci-go.yaml@341f641320553ad73969b637ff125466e6b2d99c
+  - https://github.com/platform-boutique/platform-demo-workflows/.github/workflows/service-publish.yml@341f641320553ad73969b637ff125466e6b2d99c
+  - https://github.com/platform-boutique/platform-demo-workflows/.github/workflows/subdir/service-publish.yaml@341f641320553ad73969b637ff125466e6b2d99c
+  # a branch, a tag or a short SHA instead of the 40-character commit the callers pin
+  - https://github.com/platform-boutique/platform-demo-workflows/.github/workflows/service-publish.yaml@refs/heads/main
+  - https://github.com/platform-boutique/platform-demo-workflows/.github/workflows/service-publish.yaml@main
+  - https://github.com/platform-boutique/platform-demo-workflows/.github/workflows/service-publish.yaml@341f641
+  - https://github.com/platform-boutique/platform-demo-workflows/.github/workflows/docker-promote.yaml@refs/tags/v3.3.0
+  # a service repository signing with a workflow of its own (only the old ci-main.yaml exists as an image signer)
+  - https://github.com/platform-boutique/checkout-service/.github/workflows/publish.yaml@refs/heads/main
+  - https://github.com/platform-boutique/checkout-service/.github/workflows/ci-main.yaml@refs/heads/feat/otlp-grpc-telemetry
+  - https://github.com/mladenovskistefan111/checkout-service/.github/workflows/release.yaml@refs/tags/v1.0.0
+  - https://github.com/mladenovskistefan111/checkout-service/.github/workflows/ci.yaml@refs/heads/main
+  - https://github.com/mladenovskistefan111/checkout-service/.github/workflows/ci-main.yaml@refs/heads/main
+  - https://github.com/mladenovskistefan111/not-a-service/.github/workflows/ci-main.yaml@refs/heads/feat/otlp-grpc-telemetry
+  # the old pattern accepted any workflow of any repository of either owner
+  - https://github.com/platform-boutique/anything/.github/workflows/whatever.yaml@refs/heads/main

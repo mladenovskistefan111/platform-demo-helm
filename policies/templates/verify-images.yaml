@@ -9,7 +9,7 @@ metadata:
     {{- include "pd.labels" . | nindent 4 }}
   annotations:
     policies.kyverno.io/title: "Our images are signed by our pipelines"
-    policies.kyverno.io/description: "Images from our Docker Hub namespace must carry a keyless cosign signature (classic tag format) made by a GitHub Actions workflow of one of our repositories - the same check the Helm CI runs before promotion. What is signed is what Trivy scanned: the release workflow promotes the scanned digest."
+    policies.kyverno.io/description: "Images from our Docker Hub namespace must carry a keyless cosign signature (classic tag format) made by one of the workflows listed in verifyImages.signers (the publish workflow of platform-demo-workflows, its previous generation, or an old per-repository pipeline) - the same list the Helm CI runs before promotion. What is signed is what Trivy scanned: the release workflow promotes the scanned digest."
 spec:
   {{- include "pd.actionSpec" (list . "verify-images" "workload") | nindent 2 }}
   webhookConfiguration:
@@ -32,8 +32,10 @@ spec:
       cosign:
         keyless:
           identities:
+            {{- range $v.signers }}
             - issuer: {{ $v.issuer | quote }}
-              subjectRegExp: {{ $v.subjectRegExp | quote }}
+              subjectRegExp: {{ .subjectRegExp | quote }}
+            {{- end }}
         ctlog:
           url: {{ $v.rekorUrl | quote }}
   validationConfigurations:
@@ -43,5 +45,5 @@ spec:
   validations:
     - expression: >-
         images.containers.map(image, verifyImageSignatures(image, [attestors.ci])).all(e, e > 0)
-      message: image signature verification failed (no valid keyless cosign signature from our pipelines)
+      message: image signature verification failed (no valid keyless cosign signature from one of our publish workflows)
 {{- end }}

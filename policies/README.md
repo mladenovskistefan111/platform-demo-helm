@@ -24,7 +24,7 @@ Scope **workload** = the three shop namespaces `platform-demo` (prod), `stage-pl
 |---|---|---|---|
 | `pd-pod-identity` | Validating | workload | `app.kubernetes.io/name` must be one of the 12 workload names (`identity.workloads`); the pod must run under the ServiceAccount of the same name; the label is immutable on a running pod |
 | `pd-image-source` (+`-platform`) | Validating | both | every container (init, regular, ephemeral) from the scope's repository allow-list (`images.<scope>.repositories`, as `image()` normalises them: `index.docker.io/library/redis`), pinned by digest (except `digestExempt`), never `:latest`/untagged |
-| `pd-verify-images` | ImageValidating | workload | images `mladenovskistefan/*` need a keyless cosign signature (classic tag format) from a GitHub Actions workflow of `mladenovskistefan111/*` **or `platform-boutique/*`** (images signed before the move to the organisation carry the old owner in their certificate identity, newer ones the new one; both stay valid) - the same issuer and identity regexp the Helm CI gate uses. Admission only, background scan off |
+| `pd-verify-images` | ImageValidating | workload | images `mladenovskistefan/*` need a keyless cosign signature (classic tag format) from one of the workflows in `verifyImages.signers` (see [Who may sign](#who-may-sign-an-image)); the Helm CI gate builds its identity regexp from the same list. Admission only, background scan off |
 | `pd-readonly-rootfs` (+`-platform`) | Validating | both | `readOnlyRootFilesystem: true` on every container |
 | `pd-require-resources` (+`-platform`) | Validating | both | cpu+memory requests and a memory limit (no CPU limit: it only throttles) |
 | `pd-require-probes` (+`-platform`) | Validating | both | readiness + liveness probe; pods of Jobs are skipped |
@@ -99,6 +99,38 @@ Offline tests cannot see the admission request, so `pd-protect-network-policy`, 
 - **Opt a pod out:** pod annotation `platform.demo/sandbox: disabled` (charts: `podAnnotations`). Pods that already name a `runtimeClassName`, use `hostNetwork`/`hostPID`/`hostIPC`, are privileged or mount a `hostPath` are skipped automatically: they cannot run in a user-space kernel.
 - **Fail-closed:** `failurePolicy: Fail`, so an unavailable Kyverno refuses pods in those namespaces instead of starting them unsandboxed (Kyverno itself runs in an unlabelled namespace, so there is no deadlock). Policy objects take a few seconds to become active after they are applied; the GitOps order (security layer before platform and workloads) makes that window harmless.
 - The Kyverno CLI cannot evaluate a namespace selector on a custom label offline, so `tests/sandbox` runs the policy without it (policy-check.sh strips it); the selector is part of the live suite.
+
+## Who may sign an image
+
+`pd-verify-images` and the `Cosign verify images` job of the Helm CI accept a signature only when the certificate identity (the workflow
+that ran the signing step) matches an entry of `verifyImages.signers` in `values.yaml` - and nothing else. The old pattern accepted *any*
+workflow file of *any* repository of either owner; now each form that exists is listed, with the reason it exists and when it can go:
+
+| Signer (identity of the certificate) | Why it exists | Remove when |
+|---|---|---|
+| `https://github.com/platform-boutique/platform-demo-workflows/.github/workflows/service-publish.yaml@<40-hex>` | the flat publish workflow every app repository calls: all new images | never (it is the current pipeline) |
+| `.../platform-boutique/platform-demo-workflows/.github/workflows/docker-promote.yaml@<40-hex>` | previous generation (v3.0 - v3.3); signed checkout-service `sha-d016e02` (dev, stage) and the portal image `0.1.1` | no digest in `envs/*/values` (or a rollback target) and no platform image was signed this way |
+| `.../mladenovskistefan111/platform-demo-workflows/.github/workflows/docker-promote.yaml@<40-hex>` | the same workflow before the repository moved to the organisation (certificates keep the owner of the time): the v1.0.0 images in stage and prod | stage and prod run digests signed under `platform-boutique` and no rollback target predates the move |
+| `.../mladenovskistefan111/<service>/.github/workflows/ci-main.yaml@refs/heads/feat/otlp-grpc-telemetry` (the 10 service names) | the oldest per-repository pipeline; the umbrella chart's default values (`platform-demo/values*.yaml`) still pin such digests | the umbrella chart pins digests signed by one of the entries above, or is retired |
+
+Pinning: workflows of `platform-demo-workflows` must be called by a 40-character commit SHA (`@<40-hex>`), which is how every caller pins them;
+a branch, a tag or a short SHA in the identity is refused. Per-repository `release.yaml` / `ci.yaml` signatures and any workflow of
+another repository are not accepted: no image the charts reference carries them.
+
+**How it was verified (2026-10-23, cosign v3.1.3, `--new-bundle-format=false`):** every `mladenovskistefan/*` digest in the rendered charts
+(23 images: `envs/*`, the umbrella chart, the portal) was verified with the combined regexp: 22 pass, the 23rd is the unsigned
+`product-catalog-db` (allow-listed). The signers of the real signatures are exactly the last three rows above; no real image is signed by
+`service-publish.yaml` yet (it is new) - that identity is covered by the fixtures only. The Kyverno CLI 1.19.1 also evaluated the rendered
+policy against three real signed images (one per identity form) and an unsigned one on Docker Hub: signed pass, unsigned fails; with only
+the `service-publish` entry left, the three signed ones fail (so the list is an OR and the identity matters). That run needs the network and Docker Hub quota, so it is a
+manual check: `kyverno apply <rendered pd-verify-images> --resource <pods with the digests>`.
+
+**Tests (no network):** `policies/tests/signer-identities/fixtures.yaml` lists identities that must be allowed (real ones and a
+`service-publish` one) and look-alikes that must be refused (foreign owner or repository, other workflow files of the workflows repository,
+branch/tag/short-SHA refs, a service repo's own `publish.yaml`, `release.yaml`, ...). `.github/scripts/signer-identities.py test` renders the
+real policy and checks the fixtures against its regexps and against the CI gate's combined regexp, that the template carries exactly the
+list, that no cluster values file overrides it, and that every entry is covered by an allowed fixture; `policy-check.sh` runs it. The
+Kyverno CLI cannot verify signatures offline, hence the identity-level test instead of a `kyverno-test.yaml`.
 
 ## Docker Hub and signature verification (read this)
 

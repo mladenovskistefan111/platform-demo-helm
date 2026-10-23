@@ -57,13 +57,39 @@ images:
       - quay.io/argoproj/argocd
       - ecr-public.aws.com/docker/library/redis
 
-# Keyless cosign verification of our own images: same issuer and identity pattern as the Helm CI gate (cosign verify).
+# Keyless cosign verification of our own images. This list is the ONE definition of who may sign: the Helm CI gate (`Cosign verify
+# images`, .github/scripts/verify-signatures.sh) builds its --certificate-identity-regexp from it, and
+# .github/scripts/test-signer-identities.py tests it against policies/tests/signer-identities.yaml (allowed and refused identities).
+# An image is accepted when its certificate identity matches ANY entry. Nothing broader than the images that exist: a new entry needs a
+# reason, a fixture and (for a pipeline that is gone) a removal condition. Verified against the real signatures of every digest the
+# charts reference on 2026-10-23 (cosign verify --new-bundle-format=false).
 verifyImages:
   enabled: true
   # Matched against the image string as written in the pod spec (not the normalised index.docker.io/... form).
   glob: mladenovskistefan/*
   issuer: https://token.actions.githubusercontent.com
-  subjectRegExp: '^https://github.com/(mladenovskistefan111|platform-boutique)/[a-z-]+/\.github/workflows/[a-z.-]+@.+$'
+  # The identity of a keyless signature is the workflow that ran the signing step. For a reusable workflow that is the called file in
+  # platform-demo-workflows, at the ref the caller wrote in `uses:` (we always pin a 40-character commit SHA, so only that is accepted).
+  signers:
+    - name: service-publish
+      # The flat publish workflow every app repository calls on a merge to main: builds once, scans, pushes by digest, signs.
+      # Permanent: this is the pipeline of every new image.
+      subjectRegExp: '^https://github\.com/platform-boutique/platform-demo-workflows/\.github/workflows/service-publish\.yaml@[0-9a-f]{40}$'
+    - name: docker-promote
+      # The previous generation (workflows v3.0 - v3.3): service-publish called docker-promote.yaml, which signed. Still the signer of
+      # every image published before service-publish became flat (checkout-service in dev and stage, the developer portal image).
+      # Remove when no digest in envs/*/values (nor a rollback target) and no image in the platform charts was signed this way.
+      subjectRegExp: '^https://github\.com/platform-boutique/platform-demo-workflows/\.github/workflows/docker-promote\.yaml@[0-9a-f]{40}$'
+    - name: docker-promote-before-org-move
+      # The same workflow under the account the repository belonged to before it moved to the organisation (v1.0.0 releases of the
+      # services, deployed in stage and prod). Certificates keep the owner name of the time of signing, so these stay valid forever.
+      # Remove when stage and prod run digests signed under platform-boutique and no rollback target is left from before the move.
+      subjectRegExp: '^https://github\.com/mladenovskistefan111/platform-demo-workflows/\.github/workflows/docker-promote\.yaml@[0-9a-f]{40}$'
+    - name: per-repository-ci-main
+      # The oldest pipeline: each service repository signed with its own ci-main.yaml (branch feat/otlp-grpc-telemetry). Only the
+      # umbrella chart's default values (platform-demo/values*.yaml) still pin such digests.
+      # Remove when the umbrella chart pins digests signed by one of the entries above (or the umbrella chart is retired).
+      subjectRegExp: '^https://github\.com/mladenovskistefan111/(ad-service|cart-service|checkout-service|currency-service|email-service|frontend|payment-service|product-catalog-service|recommendation-service|shipping-service)/\.github/workflows/ci-main\.yaml@refs/heads/feat/otlp-grpc-telemetry$'
   rekorUrl: https://rekor.sigstore.dev
   # Verification reads manifests from Docker Hub; anonymous pulls are limited (100 / 6 h per IP) and a throttled lookup fails
   # closed. Name of a kubernetes.io/dockerconfigjson Secret in the kyverno namespace holding a read-only Docker Hub token

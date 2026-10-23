@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Kyverno policy checks, run in CI and locally:  .github/scripts/policy-check.sh <dir with render-envs.py output>
-#   1. unit tests (policies/tests): every policy has pass/fail fixtures
+#   1. unit tests (policies/tests): every policy has pass/fail fixtures; the signer identities of pd-verify-images are tested apart
 #   2. the manifests Argo CD would deploy (every shop environment and the platform, side by side) are evaluated against the policies,
 #      so a chart change that a policy would refuse at admission fails the pull request instead of failing the sync.
 # Needs: helm, kyverno (CLI), python3 with PyYAML. Run from the repository root.
@@ -27,6 +27,12 @@ PY
 
 echo "::group::kyverno test"
 kyverno test policies/tests
+echo "::endgroup::"
+
+# The Kyverno CLI cannot verify signatures offline, so who may sign our images (pd-verify-images, verifyImages.signers) is tested on the
+# certificate identities themselves: allowed and refused fixtures against the rendered policy and the regexp of the Helm CI gate.
+echo "::group::signer identities"
+python3 .github/scripts/signer-identities.py test
 echo "::endgroup::"
 
 # Policies that read the admission request (user, subresource) cannot be evaluated offline; they have background scanning

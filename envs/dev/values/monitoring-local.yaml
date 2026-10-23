@@ -1,7 +1,0 @@
-grafana:
-  rootUrl: https://grafana.platform-demo.test
-  # Everybody signs in through Dex; the anonymous admin is gone.
-  anonymousAdmin: false
-  sso:
-    enabled: true
-    caConfigMap: platform-demo-ca

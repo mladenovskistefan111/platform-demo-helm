@@ -1,9 +1,0 @@
-apiVersion: v2
-name: monitoring-local
-description: >-
-  Lightweight single-replica observability stack for kind / laptops: Alloy (OTLP + Pyroscope receiver),
-  Mimir (monolithic), Loki, Tempo, Pyroscope and Grafana with the platform-demo dashboards. Uses the same
-  configs as platform-demo-observability/docker-compose. Not HA, data is ephemeral (emptyDir).
-type: application
-version: 0.1.0
-appVersion: "2026.10"

@@ -15,6 +15,7 @@ spec:
       hostname: "*.{{ .Values.domain }}"
       allowedRoutes:
         namespaces: { from: All }
+    {{- if .Values.tls.enabled }}
     - name: https
       protocol: HTTPS
       port: {{ .Values.listeners.https }}
@@ -22,6 +23,7 @@ spec:
       tls:
         mode: Terminate
         certificateRefs:
-          - { kind: Secret, name: {{ .Values.gateway.tlsSecretName }} }
+          - { kind: Secret, name: {{ .Values.tls.secretName }} }
       allowedRoutes:
         namespaces: { from: All }
+    {{- end }}

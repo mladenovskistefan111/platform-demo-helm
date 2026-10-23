@@ -1,20 +1,21 @@
-# Dex (https://dexidp.io). Install into the `sso` namespace; clients reach it as https://dex.<domain> (the Gateway terminates TLS
-# for browsers, a CoreDNS rewrite plus the https listener below serves the pods - see kind/README.md, "Single sign-on").
+# Dex (https://dexidp.io). Install into the `sso` namespace. Everybody - browsers and pods - reaches it as https://dex.<domain>: the ALB
+# terminates TLS (public certificate), the Gateway forwards plain HTTP to the Service, Dex speaks HTTP (port 5556).
 
-domain: platform-demo.test
+domain: platform-demo.click
 # Must be identical everywhere: it is the `iss` of every token and what the clients fetch /.well-known from.
-issuer: https://dex.platform-demo.test
+issuer: https://dex.platform-demo.click
 
 images:
   # tag = which version, digest = what actually runs (Kyverno requires a digest). Bump both together.
   dex: { repository: ghcr.io/dexidp/dex, tag: v2.46.0-distroless, digest: sha256:8ba378a122bf44478f29f9999fc92c658d047ea75f539a4c98af8b6db0da3589 }
   pullPolicy: IfNotPresent
 
-# Secret with the client secrets and the connector credentials. Never in Git: kind/up.sh creates it
-# (kind/sso-secrets.sh documents every key); on AWS External Secrets fills it.
+# Secret with the client secrets and the connector credentials: GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET and one key per client below
+# (`secretEnv`). Never in Git: External Secrets creates it from Parameter Store (docs/secrets.md in the infra repository).
 secretName: dex-secrets
-# Secret (type kubernetes.io/tls) with the certificate for dex.<domain>; the pods' own trust of the issuer. Created by kind/up.sh.
-tlsSecretName: dex-tls
+# Optional: Secret (type kubernetes.io/tls) for an HTTPS listener inside the cluster. Empty on AWS (the ALB has the certificate).
+tlsSecretName: ""
+
 
 # Storage of auth requests and tokens: `kubernetes` (custom resources in this namespace; Dex creates the CRDs itself, rbac.yaml
 # grants that) survives restarts. Not `memory`: Dex v2.46.0 deadlocked on the first refresh token with it when a local-password
@@ -31,23 +32,19 @@ github:
     - name: platform-boutique
   # Secret keys GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET in `secretName`.
 
-# Applications that trust Dex. Each needs its secret in `secretName` under the key named in secretEnv.
+# Applications that trust Dex (redirect URIs go through `tpl`, so {{ .Values.domain }} works). Each needs its secret in `secretName`
+# under the key named in secretEnv.
 clients:
   - id: backstage
     name: Backstage
     secretEnv: BACKSTAGE_CLIENT_SECRET
     redirectURIs:
-      - https://backstage.platform-demo.test/api/auth/oidc/handler/frame
+      - https://backstage.{{ .Values.domain }}/api/auth/oidc/handler/frame
   - id: argocd
     name: Argo CD
     secretEnv: ARGOCD_CLIENT_SECRET
     redirectURIs:
-      - https://argocd.platform-demo.test/auth/callback
-  - id: grafana
-    name: Grafana
-    secretEnv: GRAFANA_CLIENT_SECRET
-    redirectURIs:
-      - https://grafana.platform-demo.test/login/generic_oauth
+      - https://argocd.{{ .Values.domain }}/auth/callback
 
 # How long a login lasts. Applications keep their own session after the code exchange; this bounds token refresh.
 expiry:

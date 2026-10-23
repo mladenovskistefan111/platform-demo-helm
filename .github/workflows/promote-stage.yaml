@@ -1,0 +1,132 @@
+name: Promote to stage
+
+# Starts BY ITSELF when dev changes and waits for one click:
+#
+#   1. a pull request that moves an image in dev merges to main (envs/prod/values/*.yaml);
+#   2. this workflow starts: `Plan` shows what would go to stage and stops at the GitHub environment `stage`;
+#   3. you open the run -> Review deployments -> tick `stage` -> Approve and deploy; every app of the run is promoted with that one click;
+#   4. each app gets a pull request `promote/<app>/stage` that passes the normal checks and auto-merges; Argo CD syncs stage;
+#   5. that merge changes envs/stage, which starts "Promote to prod" (promote-prod.yaml), which waits for the `prod` reviewer.
+#
+# What starts it: a push to main that changes the `image.digest` of an app in envs/dev (comments, tags and other lines do not count; a
+# commit titled `rollback(...)` does not count either, so rolling dev back never moves stage). One run handles all apps of the push,
+# plus the apps still waiting from an earlier dev change (a newer run replaces an older one that waits, see below).
+#
+# The version recorded in stage is COMPUTED: the next patch after the newest <app>-vX.Y.Z tag of this repository (none yet: 1.0.0).
+# For another version (a minor or major) use the manual form: Actions -> Promote -> env stage, with `version`.
+#
+# A newer dev change REPLACES a run that is still waiting: only the approval job is in the concurrency group, and cancelling a waiting job
+# cannot hurt (nothing was done yet). The promotion jobs are outside of it: once someone approved, nothing cancels them. After the click the
+# plan is recomputed (promote.sh recheck) and must equal what was approved, otherwise nothing is promoted (e.g. dev was rolled back meanwhile).
+#
+# All logic is in .github/scripts/promote.sh (the manual Promote and promote-prod.yaml use the same script; tests: test-promote.sh).
+# The edit and the pull request are the shared gitops-promote workflow, the same one the app repositories call for dev.
+
+on:
+  push:
+    branches: [main]
+    paths: ['envs/dev/values/*.yaml']
+
+permissions: {}
+
+jobs:
+  # Read-only: decides which apps go to stage, to which version, and shows it. Nothing happens to stage here.
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      items: ${{ steps.plan.outputs.items }}
+      count: ${{ steps.plan.outputs.count }}
+      sha: ${{ steps.plan.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the history decides what changed in this push and which version is next
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Decide what to promote
+        id: plan
+        env:
+          MODE: auto
+          TARGET_ENV: stage
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: .github/scripts/promote.sh plan
+
+  # The one click. Waits for the reviewers of the GitHub environment `stage`. A newer run takes the place of a waiting one.
+  approve:
+    name: Approve stage deployment
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: stage
+    concurrency:
+      group: promote-stage
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      actions: read # who approved, for the summary
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Check that the approved plan is still current
+        env:
+          TARGET_ENV: stage
+          ITEMS: ${{ needs.plan.outputs.items }}
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/promote.sh recheck
+
+  promote:
+    name: Promote ${{ matrix.app }}
+    needs: [plan, approve]
+    if: needs.plan.outputs.count != '0'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.items) }}
+    permissions: {}
+    uses: platform-boutique/platform-demo-workflows/.github/workflows/gitops-promote.yaml@341f641320553ad73969b637ff125466e6b2d99c # v3.1.0
+    with:
+      app: ${{ matrix.app }}
+      env: stage
+      image-tag: ${{ matrix.tag }}
+      image-digest: ${{ matrix.digest }}
+      source-repository: ${{ github.repository }}
+      source-sha: ${{ needs.plan.outputs.sha }}
+      version: ${{ matrix.version }}
+    secrets:
+      PROMOTE_APP_ID: ${{ secrets.PROMOTE_APP_ID }}
+      PROMOTE_APP_PRIVATE_KEY: ${{ secrets.PROMOTE_APP_PRIVATE_KEY }}
+
+  # The pull requests of this run, in one table.
+  result:
+    name: Result
+    needs: [plan, approve, promote]
+    if: ${{ !cancelled() && needs.approve.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: List the pull requests
+        env:
+          TARGET_ENV: stage
+          ITEMS: ${{ needs.plan.outputs.items }}
+          PROMOTE_RESULT: ${{ needs.promote.result }}
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/promote.sh result

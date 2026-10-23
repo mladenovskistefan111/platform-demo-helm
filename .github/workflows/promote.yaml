@@ -1,19 +1,25 @@
 name: Promote
 
-# Moves what is in the PREVIOUS environment on main to the next one (stage <- dev, prod <- stage), through a pull request that
-# passes the same checks as any change. Started by a person: Actions -> Promote -> Run workflow.
+# The manual form of the promotion chain. Normally you do not need it: "Promote to stage" starts by itself when dev changes and
+# "Promote to prod" starts by itself when stage changes (promote-stage.yaml, promote-prod.yaml), each waiting for one click.
+# Use this form to promote an app that has no waiting run (a run was rejected or replaced), to promote everything at once, or to choose
+# the version yourself. Started by a person: Actions -> Promote -> Run workflow (branch: main).
 #
 #   app      one of the shop services (a dropdown) or `all` (every app whose digest differs). The list is checked against the
 #            workloads by .github/scripts/check-dispatch-apps.py in CI: add a service there when you add a workload.
 #   env      stage or prod
-#   version  X.Y.Z. Required for stage: it is recorded next to the digest (`# vX.Y.Z` on the image.digest line) and, after the merge,
-#            becomes the tag and GitHub Release <app>-vX.Y.Z of THIS repository (stage-release.yaml). For prod leave it empty: the
-#            version comes from stage unchanged (if you type one it must equal the one in stage; a safeguard for the person approving).
+#   version  X.Y.Z. Stage: empty = computed (the next patch after the newest <app>-vX.Y.Z tag of this repository; none yet: 1.0.0),
+#            or type one (a minor or major bump). It is recorded next to the digest (`# vX.Y.Z` on the image.digest line) and, after
+#            the merge, becomes the tag and GitHub Release <app>-vX.Y.Z (stage-release.yaml). Prod: leave it empty, the version comes
+#            from stage unchanged (if you type one it must equal the one in stage; a safeguard for the person approving).
 #
+# Same three steps as the automatic ones, the same script (.github/scripts/promote.sh) and the same gitops-promote workflow:
+#   Plan (read-only, shows what changes) -> Approve <env> deployment (the GitHub environment of the target: stage or prod; Review
+#   deployments) -> Promote <app> (one pull request per app, normal checks, auto-merge).
 # The digest is read from the previous environment's file at the current main. Nothing is rebuilt and the registry is never asked for
 # "the newest": what runs in stage is exactly what dev ran, and what runs in prod is exactly what stage ran.
-# The edit and the pull request are the shared gitops-promote workflow (the same one the app repositories call for dev).
-# Prod waits for the reviewer of the GitHub environment `prod` after the plan (below) has been shown.
+
+run-name: Promote ${{ inputs.app }} to ${{ inputs.env }}
 
 on:
   workflow_dispatch:
@@ -29,7 +35,7 @@ on:
         options: [stage, prod]
         required: true
       version:
-        description: "Release version X.Y.Z (required for stage; empty for prod: taken from stage)"
+        description: "Release version X.Y.Z (stage: empty = the next patch, computed; prod: empty, taken from stage)"
         type: string
         required: false
         default: ""
@@ -37,7 +43,7 @@ on:
 permissions: {}
 
 jobs:
-  # Read-only: decides what would change and shows it, so the prod reviewer approves a concrete list.
+  # Read-only: decides what would change and shows it, so the person approving sees a concrete list.
   plan:
     name: Plan
     runs-on: ubuntu-latest
@@ -48,113 +54,54 @@ jobs:
       items: ${{ steps.plan.outputs.items }}
       count: ${{ steps.plan.outputs.count }}
       sha: ${{ steps.plan.outputs.sha }}
-    env:
-      APP: ${{ inputs.app }}
-      TARGET_ENV: ${{ inputs.env }}
-      VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
+          fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
 
       - name: Decide what to promote
         id: plan
-        run: |
-          set -euo pipefail
-          # shellcheck source=/dev/null
-          source .github/scripts/promotion-policy.sh
-          problems=0
-          problem() { echo "::error::$1"; problems=$((problems + 1)); }
-          [ "$GITHUB_REF" = refs/heads/main ] || { echo "::error::Run Promote from main (it was started from $GITHUB_REF)."; exit 1; }
-          case "$TARGET_ENV" in
-            stage) prev=dev ;;
-            prod) prev=stage ;;
-            *) echo "::error::env must be stage or prod."; exit 1 ;;
-          esac
-          semver='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
-          if [ "$TARGET_ENV" = stage ]; then
-            [[ "$VERSION" =~ $semver ]] || { echo "::error::A promotion to stage needs a version X.Y.Z (got '$VERSION')."; exit 1; }
-          elif [ -n "$VERSION" ]; then
-            [[ "$VERSION" =~ $semver ]] || { echo "::error::version must be X.Y.Z (got '$VERSION')."; exit 1; }
-          fi
+        env:
+          MODE: manual
+          APP: ${{ inputs.app }}
+          TARGET_ENV: ${{ inputs.env }}
+          VERSION: ${{ inputs.version }}
+        run: .github/scripts/promote.sh plan
 
-          apps=()
-          if [ "$APP" = all ]; then
-            for f in envs/"$prev"/values/*.yaml; do
-              [ -n "$(img_digest < "$f")" ] && apps+=("$(basename "$f" .yaml)")
-            done
-          else
-            [[ "$APP" =~ ^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$ ]] || { echo "::error::app '$APP' is not a chart name."; exit 1; }
-            apps=("$APP")
-          fi
-
-          items='[]'
-          rows=()
-          for app in "${apps[@]}"; do
-            src="envs/$prev/values/$app.yaml"; dst="envs/$TARGET_ENV/values/$app.yaml"
-            sd=""; [ -f "$src" ] && sd=$(img_digest < "$src")
-            if [ -z "$sd" ]; then problem "$src has no image.digest: nothing to promote from."; continue; fi
-            if [ ! -f "$dst" ]; then
-              if [ "$APP" = all ]; then echo "::warning::$dst does not exist; skipped."; continue; fi
-              problem "$dst does not exist. Create it first (copy $src) in a normal pull request."; continue
-            fi
-            dd=$(img_digest < "$dst"); dv=$(img_version < "$dst"); st=$(img_tag < "$src")
-            if [ "$TARGET_ENV" = stage ]; then ver=$VERSION; else ver=$(img_version < "$src"); fi
-            if [ "$TARGET_ENV" = prod ] && [ -n "$VERSION" ] && [ -n "$ver" ] && [ "$VERSION" != "$ver" ]; then
-              problem "$app: stage has version $ver, not $VERSION. Prod takes the version from stage."; continue
-            fi
-            # Same rule as gitops-promote: a different digest changes the file; the same digest only when it still lacks the version.
-            need=false
-            if [ "$sd" != "$dd" ]; then need=true
-            elif [ -n "$ver" ] && [ -z "$dv" ]; then need=true
-            elif [ "$APP" != all ] && [ -n "$ver" ] && [ "$dv" != "$ver" ]; then problem "$app: $TARGET_ENV already has this digest as version $dv, not $ver."; continue
-            fi
-            $need || { echo "$app: $TARGET_ENV already has $sd."; continue; }
-            if [ -z "$ver" ]; then problem "$app: $prev has no version for this digest (no '# vX.Y.Z' on its image.digest line). Promote it to stage with a version first."; continue; fi
-            if [ "$TARGET_ENV" = stage ] && git rev-parse --quiet --verify "refs/tags/$app-v$ver" > /dev/null; then
-              problem "$app: the tag $app-v$ver exists already. Choose the next version."; continue
-            fi
-            [ -n "$st" ] || st="sha256-${sd:7:12}"
-            items=$(jq -c --arg app "$app" --arg tag "$st" --arg digest "$sd" --arg version "$ver" '. + [{app: $app, tag: $tag, digest: $digest, version: $version}]' <<< "$items")
-            rows+=("| $app | \`$st\` | \`${dd:0:19}\` | \`${sd:0:19}\` | $ver |")
-          done
-          [ "$problems" -eq 0 ] || exit 1
-
-          count=$(jq length <<< "$items")
-          {
-            echo "items=$items"
-            echo "count=$count"
-            echo "sha=$(git rev-parse HEAD)"
-          } >> "$GITHUB_OUTPUT"
-          {
-            echo "### Promote to \`$TARGET_ENV\` (from \`$prev\` at main \`$(git rev-parse --short HEAD)\`)"
-            echo
-            if [ "$count" -eq 0 ]; then
-              echo "Nothing to promote: \`$TARGET_ENV\` already has what \`$prev\` has."
-            else
-              echo "| App | Tag | $TARGET_ENV now | will become | Version |"
-              echo "|---|---|---|---|---|"
-              printf '%s\n' "${rows[@]}"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  # Production only: waits for the reviewer of the GitHub environment `prod` (deployment branch: main). The plan above is on the run page.
+  # Waits for the reviewers of the GitHub environment of the target (stage or prod; deployment branch: main).
   approve:
-    name: Approve (prod)
+    name: Approve ${{ inputs.env }} deployment
     needs: plan
-    if: inputs.env == 'prod' && needs.plan.outputs.count != '0'
+    if: needs.plan.outputs.count != '0'
     runs-on: ubuntu-latest
-    environment: prod
-    permissions: {}
+    timeout-minutes: 5
+    environment: ${{ inputs.env }}
+    permissions:
+      contents: read
+      actions: read # who approved, for the summary
     steps:
-      - run: echo "Approved by a reviewer of the prod environment."
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Check that the approved plan is still current
+        env:
+          TARGET_ENV: ${{ inputs.env }}
+          VERSION: ${{ inputs.version }}
+          ITEMS: ${{ needs.plan.outputs.items }}
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/promote.sh recheck
 
   promote:
     name: Promote ${{ matrix.app }}
     needs: [plan, approve]
-    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.count != '0' && (inputs.env != 'prod' || needs.approve.result == 'success') }}
+    if: needs.plan.outputs.count != '0'
     strategy:
       fail-fast: false
       matrix:
@@ -173,3 +120,27 @@ jobs:
     secrets:
       PROMOTE_APP_ID: ${{ secrets.PROMOTE_APP_ID }}
       PROMOTE_APP_PRIVATE_KEY: ${{ secrets.PROMOTE_APP_PRIVATE_KEY }}
+
+  # The pull requests of this run, in one table.
+  result:
+    name: Result
+    needs: [plan, approve, promote]
+    if: ${{ !cancelled() && needs.approve.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: List the pull requests
+        env:
+          TARGET_ENV: ${{ inputs.env }}
+          ITEMS: ${{ needs.plan.outputs.items }}
+          PROMOTE_RESULT: ${{ needs.promote.result }}
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/promote.sh result

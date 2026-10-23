@@ -9,14 +9,16 @@ name: Rollback
 #   to = sha256:... a digest that this app had before in any environment
 #   to = <git sha>  a commit of this repository on main: the image of the app as it was then
 # Prod waits for the reviewer of the GitHub environment `prod`.
+# The app list is a dropdown, checked against the workloads by .github/scripts/check-dispatch-apps.py in CI.
 # Details and the rules live in the shared gitops-rollback workflow.
 
 on:
   workflow_dispatch:
     inputs:
       app:
-        description: Chart name (checkout-service, frontend, ...)
-        type: string
+        description: The app to roll back
+        type: choice
+        options: [ad-service, cart-service, checkout-service, currency-service, email-service, frontend, payment-service, product-catalog-service, recommendation-service, shipping-service]
         required: true
       env:
         description: Environment

@@ -14,3 +14,9 @@
 /recommendation-service/charts/*.tgz
 /shipping-service/charts/*.tgz
 .DS_Store
+
+# Never commit key material or environment files
+*.key
+*.pem
+.env
+.env.*

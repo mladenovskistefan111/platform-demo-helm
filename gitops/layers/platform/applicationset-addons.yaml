@@ -1,9 +1,14 @@
-# Platform add-ons per environment: the Gateway + routes and the (local) monitoring stack.
+# Platform add-ons per environment: Gateway + routes, Dex, Backstage ... one Application per line of envs/<env>/addons.yaml.
+# Wave 10 of the platform layer. (Ordering BETWEEN the generated Applications is not possible - they are created by the controller, not
+# by a sync - so they rely on retries, like the shop does: Dex and Backstage wait for their Secrets, which already exist by now.)
+# An entry may carry `cluster: <name>` to target a cluster other than the one Argo CD runs in (default in-cluster).
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
   name: platform-addons
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
 spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
@@ -35,16 +40,12 @@ spec:
           ignoreMissingValueFiles: true
           valueFiles:
             - '../envs/{{ .values.env }}/values/{{ .app }}.yaml'
-      destination: { name: in-cluster, namespace: '{{ .namespace }}' }
+      destination: { name: '{{ index . "cluster" | default "in-cluster" }}', namespace: '{{ .namespace }}' }
       syncPolicy:
         automated: { prune: true, selfHeal: true }
-        syncOptions: [CreateNamespace=true, ServerSideApply=true]
-        # Third-party stacks: no privileged pods, and anything that would not pass `restricted` is called out (Kyverno
-        # reports the namespace; see policies/README.md).
-        managedNamespaceMetadata:
-          labels:
-            pod-security.kubernetes.io/enforce: baseline
-            pod-security.kubernetes.io/warn: restricted
+        # No CreateNamespace: the namespace (with its Pod Security / sandbox labels) must be declared in envs/<env>/values/cluster-bootstrap.yaml.
+        # An undeclared namespace fails loudly at sync instead of silently appearing unlabelled; CI checks it too.
+        syncOptions: [ServerSideApply=true]
         retry:
           limit: 6
           backoff: { duration: 10s, factor: 2, maxDuration: 3m }

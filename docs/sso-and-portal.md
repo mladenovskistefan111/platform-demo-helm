@@ -22,7 +22,7 @@ Argo CD and Grafana trust Dex. The portal's own documentation, with the architec
 | Argo CD login | `gitops/argocd/values.yaml` (`oidc.config`, `admin.enabled: "false"`, RBAC, CA mount) |
 | Grafana login | `monitoring-local/` (`grafana.sso`), `envs/dev/values/monitoring-local.yaml` |
 | Kyverno | `policies/values.yaml`: `backstage` and `sso` are platform-scope namespaces; image allow-list gained Dex, PostgreSQL and the portal image |
-| Argo CD project | `gitops/apps/appproject-platform.yaml`: destinations `backstage`, `sso` |
+| Argo CD project | `gitops/apps/appproject-platform.yaml`: destinations `backstage`, `sso`; namespaces in `envs/dev/values/cluster-bootstrap.yaml` |
 | Local bootstrap | `kind/` (below) |
 
 ## How a login travels

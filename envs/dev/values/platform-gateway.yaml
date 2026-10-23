@@ -1,4 +1,4 @@
-# kind: Cilium host-network Gateway, listeners on 8080/8443 published as 80/443 by kind/cluster.yaml
+# dev = the AWS cluster. TLS ends at the ALB (Terraform), so the Gateway listens with plain HTTP on the port the ALB forwards to
+# (infra stacks/platform: gateway_port = 8080) and the chart defaults apply (domain platform-demo.click, no HTTPS listener, X-Forwarded-Proto: https).
 listeners:
   http: 8080
-  https: 8443

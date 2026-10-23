@@ -1,7 +1,7 @@
-# dev = the local kind cluster. The only way in is GitHub: create the OAuth App of the organisation (callback
-# https://dex.platform-demo.test/callback) and put its id and secret into the Secret (kind/sso-secrets.sh with GITHUB_OAUTH_CLIENT_ID and
-# GITHUB_OAUTH_CLIENT_SECRET). There are no local passwords.
-domain: platform-demo.test
-issuer: https://dex.platform-demo.test
+# dev = the AWS cluster. The only way in is GitHub: create the OAuth App of the organisation (callback
+# https://dex.platform-demo.click/callback) and type its id and secret into Parameter Store (/platform-demo/github-oauth/*,
+# see docs/secrets.md in the infra repository); External Secrets turns them into the Secret `sso/dex-secrets`. There are no local passwords.
+domain: platform-demo.click
+issuer: https://dex.platform-demo.click
 github:
   enabled: true

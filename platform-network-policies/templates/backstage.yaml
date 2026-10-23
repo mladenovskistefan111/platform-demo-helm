@@ -7,6 +7,8 @@ metadata:
   namespace: backstage
   labels:
     {{- include "pnp.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   description: >-
     The portal is reached only through the Gateway. It needs DNS, the Kubernetes API (Kubernetes plugin), HTTPS (GitHub, the public Dex and
@@ -45,6 +47,8 @@ metadata:
   namespace: backstage
   labels:
     {{- include "pnp.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   description: Pods of the namespace may reach each other (the portal and a PostgreSQL pod, if the chart runs one).
   endpointSelector: {}

@@ -1,11 +1,10 @@
-# dev: the workload profile (platform-demo) is ENFORCED; the platform profile (monitoring, argocd) only reports.
+# dev = the AWS cluster. The workload profile (platform-demo) is ENFORCED; the platform profile (argocd, backstage, sso) only reports.
 # Per-policy overrides go under `actions`, e.g. { pod-identity: Audit } to demote one while investigating.
 defaultAction: Deny
 enforcePlatform: false
+domain: platform-demo.click
 
-actions:
-  # Signature verification reads manifests from Docker Hub at every pod admission. Anonymous pulls are limited to 100 per hour
-  # per IP and a fresh `kind/up.sh` already uses most of them, so a throttled lookup is an ERROR and an enforcing policy turns
-  # errors into denials (failurePolicy does not change that). Until a read-only Docker Hub token is configured
-  # (verifyImages.pullSecret, see policies/README.md) this one policy only reports. Remove this line once it is.
-  verify-images: Audit
+# Signature verification (pd-verify-images) is enforced: it reads manifests from Docker Hub with the read-only token that External
+# Secrets creates as kyverno/dockerhub-read (verifyImages.pullSecret in the chart defaults), so the anonymous rate limit is not an issue.
+# If a lookup misbehaves on the first deploy, demote just this policy while you debug:  actions: { verify-images: Audit }
+actions: {}

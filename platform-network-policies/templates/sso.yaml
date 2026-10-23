@@ -7,6 +7,8 @@ metadata:
   namespace: sso
   labels:
     {{- include "pnp.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   description: >-
     Dex is reached only through the Gateway (browsers, and the applications that fetch the issuer URL through the NAT gateway and the ALB,

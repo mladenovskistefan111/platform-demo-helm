@@ -1,9 +1,14 @@
-# Applied to every workload in this environment.
+# Applied to every workload in this environment (dev = the AWS cluster).
 global:
   networkPolicy:
     type: cilium        # CiliumNetworkPolicy with SPIFFE/SPIRE mutual authentication (see platform-common)
+# Mutual authentication is ON (the chart default, stated here on purpose): every rule between two services requires a SPIFFE identity.
+# It needs SPIRE, which Terraform installs with Cilium; gitops/layers/bootstrap restarts Cilium once SPIRE is up, before this layer syncs.
+networkPolicy:
+  cilium:
+    authentication: required
 
-# Laptop profile (same as platform-demo/values-dev.yaml): one replica, no HPA/PDB/spread.
+# Small profile (same as platform-demo/values-dev.yaml): one replica, no HPA/PDB/spread (two Spot nodes, one namespace quota).
 replicaCount: 1
 autoscaling: { enabled: false }
 podDisruptionBudget: { enabled: false }

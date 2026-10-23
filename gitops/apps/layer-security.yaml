@@ -1,0 +1,28 @@
+# Layer "security": External Secrets (waits for its secrets), Reloader, Kyverno, then the policies. Nothing else may start before admission control and secrets exist.
+# Sync wave 10 of platform-root: Argo CD syncs the layer, then waits until every Application in it is Healthy before it starts the
+# next wave. Deleting this file (or the layer's directory contents) removes the layer and, through the finalizer, everything in it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: layer-security
+  namespace: argocd
+  labels:
+    platform.demo/layer: security
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  # platform-admin on purpose: whoever may create Applications in the argocd namespace may name any project, so a "smaller" project
+  # here would only look safer. The projects that matter limit what the Applications INSIDE the layer may deploy.
+  project: platform-admin
+  source:
+    repoURL: https://github.com/platform-boutique/platform-demo-helm.git
+    targetRevision: main
+    path: gitops/layers/security
+  destination: { name: in-cluster, namespace: argocd }
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [ServerSideApply=true]
+    retry:
+      limit: 10
+      backoff: { duration: 15s, factor: 2, maxDuration: 5m }

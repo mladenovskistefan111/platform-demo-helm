@@ -4,7 +4,7 @@
 service repos  --release tag-->  Docker Hub (signed image, digest)
                                         |  PR: bump image.digest in envs/<env>/values/<app>.yaml
                                         v
-platform-demo-helm  (this repo, main)  <--- Argo CD polls --- ApplicationSets (gitops/apps)
+platform-demo-helm  (this repo, main)  <--- Argo CD polls --- app-of-apps layers (gitops/apps, gitops/layers)
    charts + envs/ + gitops/                                      |
                                                                   v
                                                   one Application per (env, app) -> cluster

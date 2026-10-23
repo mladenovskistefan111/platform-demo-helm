@@ -7,6 +7,8 @@ metadata:
   namespace: argocd
   labels:
     {{- include "pnp.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   description: >-
     Argo CD's components (server, repo-server, application-controller, ApplicationSet controller, Redis) talk to each other freely.
@@ -31,6 +33,8 @@ metadata:
   namespace: argocd
   labels:
     {{- include "pnp.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   description: The Gateway (Cilium Envoy, entity `ingress`) reaches the Argo CD API/UI; so may the listed namespaces in-cluster.
   endpointSelector:

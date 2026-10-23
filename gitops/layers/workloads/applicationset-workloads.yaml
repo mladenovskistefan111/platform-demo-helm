@@ -1,5 +1,7 @@
-# One Application per (environment, workload). Adding an environment = adding envs/<name>/; adding a workload = one line in
-# envs/<name>/workloads.yaml. Promotion = a PR that changes image.digest in envs/<name>/values/<app>.yaml.
+# One Application per (environment, workload). Adding a workload = one line in envs/<env>/workloads.yaml (its namespace must be declared in
+# envs/<env>/values/cluster-bootstrap.yaml). Promotion = a PR that changes image.digest in envs/<env>/values/<app>.yaml.
+# The whole layer is switched off by `[]` in envs/<env>/workloads.yaml. An entry may carry `cluster: <name>` (default in-cluster) for
+# the day the shop moves to its own cluster.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -26,7 +28,7 @@ spec:
         platform.demo/kind: workload
       finalizers: [resources-finalizer.argocd.argoproj.io]
     spec:
-      project: platform
+      project: workloads
       source:
         repoURL: https://github.com/platform-boutique/platform-demo-helm.git
         targetRevision: main
@@ -37,14 +39,11 @@ spec:
           valueFiles:
             - '../envs/{{ .values.env }}/values/common.yaml'
             - '../envs/{{ .values.env }}/values/{{ .app }}.yaml'
-      destination: { name: in-cluster, namespace: '{{ .namespace }}' }
+      destination: { name: '{{ index . "cluster" | default "in-cluster" }}', namespace: '{{ .namespace }}' }
       syncPolicy:
         automated: { prune: true, selfHeal: true }
-        syncOptions: [CreateNamespace=true, ServerSideApply=true, PruneLast=true]
-        managedNamespaceMetadata:
-          labels:
-            pod-security.kubernetes.io/enforce: restricted
-            platform.demo/profile: workload     # Kyverno: namespace baseline (quota, limits, default-deny) and the strict policy profile
+        # The namespace (restricted, workload profile, gVisor) is declared in envs/<env>/values/cluster-bootstrap.yaml, not created here.
+        syncOptions: [ServerSideApply=true, PruneLast=true]
         retry:
           limit: 6
           backoff: { duration: 10s, factor: 2, maxDuration: 3m }

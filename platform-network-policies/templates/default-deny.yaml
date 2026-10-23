@@ -7,6 +7,8 @@ metadata:
   namespace: {{ . }}
   labels:
     {{- include "pnp.labels" $ | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   description: Default deny in both directions (kubelet health probes are always allowed by Cilium); the other policies in this namespace add what is needed.
   endpointSelector: {}

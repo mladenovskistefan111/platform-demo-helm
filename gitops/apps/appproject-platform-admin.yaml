@@ -1,4 +1,5 @@
-# Adopted from gitops/bootstrap/root.yaml so that changes to it are reviewed like everything else.
+# Adopted from gitops/bootstrap/root.yaml (which Terraform mirrors in its root chart) so that changes to it are reviewed like everything else.
+# KEEP THIS SPEC IDENTICAL to the AppProject in gitops/bootstrap/root.yaml.
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:

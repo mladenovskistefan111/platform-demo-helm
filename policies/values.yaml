@@ -15,7 +15,7 @@ scopes:
   platform: [monitoring, argocd, backstage, sso]  # third-party stacks and the portal: registry/resources/probes checks, never the identity rules
 
 # Hostnames HTTPRoutes may claim.
-domain: platform-demo.test
+domain: platform-demo.click
 
 # Cilium derives the network identity of a pod from its labels, so any pod labelled app.kubernetes.io/name=frontend IS
 # the frontend to every CiliumNetworkPolicy. These are the only names a pod in a workload namespace may carry, and a pod
@@ -72,14 +72,14 @@ verifyImages:
   rekorUrl: https://rekor.sigstore.dev
   # Verification reads manifests from Docker Hub; anonymous pulls are limited (100 / 6 h per IP) and a throttled lookup fails
   # closed. Name of a kubernetes.io/dockerconfigjson Secret in the kyverno namespace holding a read-only Docker Hub token
-  # (kind/up.sh creates `dockerhub-read` when DOCKERHUB_USERNAME and DOCKERHUB_TOKEN are set). Empty = anonymous.
+  # (created outside Git from the SSM parameters /platform-demo/dockerhub/*; on AWS External Secrets fills it). Empty = anonymous.
   pullSecret: ""
   # Images that are knowingly unsigned. Each one is a PolicyException in the kyverno namespace (see exceptions.yaml): the pod must
   # carry app.kubernetes.io/name=<name> AND every container must use <imagePrefix>... (spec.images of an exception is not used on purpose).
   unsigned:
     - name: product-catalog-db
       imagePrefix: "mladenovskistefan/product-catalog-db@sha256:"
-      reason: Temporary hand-built local-testing image (replaced by RDS on AWS); same allow-list entry as in the Helm CI.
+      reason: Temporary hand-built image (replaced by RDS); same allow-list entry as in the Helm CI.
 
 # Who may change network policy and traffic-exposing objects (CiliumNetworkPolicy, NetworkPolicy, Gateway, HTTPRoute) in
 # policed namespaces: Argo CD, Kyverno's own generator, the cluster's housekeeping controllers and cluster admins.

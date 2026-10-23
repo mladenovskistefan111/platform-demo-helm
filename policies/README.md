@@ -30,7 +30,7 @@ Scope **workload** = `platform-demo` (strict, enforced). Scope **platform** = `m
 | `pd-require-probes` (+`-platform`) | Validating | both | readiness + liveness probe; pods of Jobs are skipped |
 | `pd-service-account` | Validating | workload | not the `default` ServiceAccount; `automountServiceAccountToken: false` |
 | `pd-restrict-service-types` | Validating | cluster (except `gateway-system`) | `ClusterIP` only, no `externalIPs`. The Cilium Gateway Service is a NodePort in `gateway-system` |
-| `pd-restrict-route-hostnames` | Validating | cluster | HTTPRoutes must name hostnames, all under `domain` (`.platform-demo.test`) |
+| `pd-restrict-route-hostnames` | Validating | cluster | HTTPRoutes must name hostnames, all under `domain` (`.platform-demo.click`) |
 | `pd-protect-network-policy` | Validating | workload, platform, `gateway-system` | create/update/delete of CiliumNetworkPolicy, CiliumClusterwideNetworkPolicy, NetworkPolicy, Gateway, HTTPRoute only by Argo CD, Kyverno's generator, the namespace/garbage-collector controllers or a cluster admin (`protectedChanges`). Reads `request.userInfo`, so admission only |
 | `pd-no-exec-without-break-glass` | Validating | workload | `pods/exec`, `pods/attach`, `pods/ephemeralcontainers` refused unless the pod has `platform.demo/break-glass: "true"` |
 | `pd-namespace-pod-security` | Validating | cluster | workload namespaces (and any namespace labelled `platform.demo/profile: workload`) must enforce Pod Security `restricted`; platform namespaces at least `baseline` |
@@ -63,7 +63,7 @@ Failure policy is derived from the action: `Fail` when a policy can deny, `Ignor
 
 A `PolicyException` lives in the **`kyverno` namespace** (Kyverno ignores exceptions from anywhere else, `features.policyExceptions.namespace`), so nobody can exempt their own workload from inside its namespace. They are rendered from `values.yaml`:
 
-- `verifyImages.unsigned`: images that are knowingly unsigned. Today only `product-catalog-db` (a temporary hand-built local-testing image, replaced by RDS on AWS; the same entry is allow-listed by name in the Helm CI). Matched with **CEL on the pod** (label `app.kubernetes.io/name` *and* every container image starting with `mladenovskistefan/product-catalog-db@sha256:`).
+- `verifyImages.unsigned`: images that are knowingly unsigned. Today only `product-catalog-db` (a temporary hand-built image, replaced by RDS; the same entry is allow-listed by name in the Helm CI). Matched with **CEL on the pod** (label `app.kubernetes.io/name` *and* every container image starting with `mladenovskistefan/product-catalog-db@sha256:`).
 - `exceptions`: anything else. Today: the Argo CD application controller has no liveness probe (upstream removed it on purpose).
 
 Do not use `spec.images` in an exception: Kyverno before 1.19.1 ignored it (the exception then disabled verification for the *whole pod*), and matching on CEL is explicit anyway. Every exception needs a `reason`.
@@ -92,11 +92,11 @@ Offline tests cannot see the admission request, so `pd-protect-network-policy`, 
 
 ## Docker Hub and signature verification (read this)
 
-`pd-verify-images` reads the image manifest and its `sha256-<digest>.sig` from Docker Hub **at every pod admission**. Anonymous pulls are limited (100 per hour per IP) and a fresh `kind/up.sh` already uses most of them, so a lookup can fail with `TOOMANYREQUESTS`. For an enforcing policy a lookup *error* is a denial (`failurePolicy` does not change that), which would block rollouts. Therefore:
+`pd-verify-images` reads the image manifest and its `sha256-<digest>.sig` from Docker Hub **at every pod admission**. Anonymous pulls are limited (100 per hour per IP) and a fresh cluster already uses most of them, so a lookup can fail with `TOOMANYREQUESTS`. For an enforcing policy a lookup *error* is a denial (`failurePolicy` does not change that), which would block rollouts. Therefore:
 
 - background re-verification is off (`evaluation.background.enabled: false`);
 - in **dev the policy only reports** (`actions: { verify-images: Audit }` in `envs/dev/values/policies.yaml`) until a read-only Docker Hub token exists;
-- to enforce: create a Docker Hub access token with read-only scope, run `DOCKERHUB_USERNAME=... DOCKERHUB_TOKEN=... kind/up.sh` (or create the Secret by hand: `kubectl -n kyverno create secret docker-registry dockerhub-read --docker-server=https://index.docker.io/v1/ --docker-username=... --docker-password=...`), set `verifyImages.pullSecret: dockerhub-read` in `envs/dev/values/policies.yaml` and delete the `verify-images: Audit` override. The Secret never goes into Git.
+- to enforce: create a Docker Hub access token with read-only scope, create the Secret `dockerhub-read` in the `kyverno` namespace outside Git (for example `kubectl -n kyverno create secret docker-registry dockerhub-read --docker-server=https://index.docker.io/v1/ --docker-username=... --docker-password=...`), set `verifyImages.pullSecret: dockerhub-read` in `envs/dev/values/policies.yaml` and delete the `verify-images: Audit` override. The Secret never goes into Git.
 
 Verified before the quota ran out (2026-10-17): all 10 deployed service images verify; an image without a valid signature is denied (`image signature verification failed`); the `product-catalog-db` exception admits only that image under its own label.
 

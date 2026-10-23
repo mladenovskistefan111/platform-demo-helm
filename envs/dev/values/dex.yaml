@@ -1,7 +1,7 @@
-# dev = the local kind cluster. The only way in is GitHub: create the OAuth App of the organisation (callback
-# https://dex.platform-demo.test/callback) and put its id and secret into the Secret (kind/sso-secrets.sh with GITHUB_OAUTH_CLIENT_ID and
-# GITHUB_OAUTH_CLIENT_SECRET). There are no local passwords.
-domain: platform-demo.test
-issuer: https://dex.platform-demo.test
+# dev = the EKS cluster. The only way in is GitHub: create the OAuth App of the organisation (callback
+# https://dex.platform-demo.click/callback); its id and secret reach the Secret through External Secrets (SSM parameters
+# /platform-demo/github-oauth/*). There are no local passwords.
+domain: platform-demo.click
+issuer: https://dex.platform-demo.click
 github:
   enabled: true

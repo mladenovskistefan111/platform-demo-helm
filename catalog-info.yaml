@@ -3,7 +3,7 @@ kind: Component
 metadata:
   name: platform-demo-helm
   title: platform-demo-helm
-  description: "Helm charts, per-environment values, Argo CD configuration, Kyverno policies and the local kind cluster."
+  description: "Helm charts, per-environment values, Argo CD configuration, Kyverno policies and the GitOps configuration of the EKS cluster."
   annotations:
     github.com/project-slug: platform-boutique/platform-demo-helm
     backstage.io/source-location: url:https://github.com/platform-boutique/platform-demo-helm/tree/main/
@@ -13,7 +13,7 @@ metadata:
   tags: [helm, gitops, kyverno]
   links:
     - { url: "https://github.com/platform-boutique/platform-demo-helm", title: "Repository", icon: github }
-    - { url: "https://argocd.platform-demo.test", title: "Argo CD", icon: dashboard }
+    - { url: "https://argocd.platform-demo.click", title: "Argo CD", icon: dashboard }
 spec:
   type: deployment-config
   lifecycle: experimental

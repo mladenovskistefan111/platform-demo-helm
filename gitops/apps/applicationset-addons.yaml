@@ -1,4 +1,4 @@
-# Platform add-ons per environment: the Gateway + routes and the (local) monitoring stack.
+# Platform add-ons per environment: the Gateway + routes, Dex and Backstage.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:

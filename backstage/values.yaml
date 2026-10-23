@@ -1,38 +1,35 @@
 # Backstage (image built from platform-boutique/platform-demo-backstage). Install into the `backstage` namespace.
 
-domain: platform-demo.test
-clusterName: platform-local
+domain: platform-demo.click
+clusterName: platform-demo
 
 images:
   # tag = which version, digest = what actually runs. The digest of a released image is promoted here by a pull request, like
-  # every other service (platform-demo-backstage/README.md, "First release"). Empty = the tag is used as it is (local builds).
+  # every other service (platform-demo-backstage/README.md, "First release"). Empty = the tag is used as it is.
   backstage: { repository: mladenovskistefan/platform-demo-backstage, tag: 0.1.0, digest: "" }
   postgres: { repository: postgres, tag: 17-alpine, digest: sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24 }
   pullPolicy: IfNotPresent
 
 # Which configuration layers the image loads (see platform-demo-backstage/app-config*.yaml). `app-config.github.yaml` is the
-# production catalog (needs GITHUB_TOKEN); `app-config.kind.yaml` reads the catalog from the local source server.
+# production catalog (needs GITHUB_TOKEN).
 config:
   files: [app-config.yaml, app-config.production.yaml]
   # Extra configuration layered last, without rebuilding the image (a map in app-config syntax, rendered into a ConfigMap).
-  # kind/local-source.sh uses it in the lean profile to switch the Grafana cards off.
+  # E.g. to switch the Grafana cards off when Grafana is not deployed.
   overlay: {}
 
 # Secret with POSTGRES_PASSWORD, BACKSTAGE_OIDC_CLIENT_SECRET, AUTH_SESSION_SECRET, GRAFANA_TOKEN and
-# (production) GITHUB_TOKEN. Never in Git: kind/up.sh and kind/sso-bootstrap.sh create it; on AWS External Secrets fills it.
+# (production) GITHUB_TOKEN. Never in Git: External Secrets fills it from AWS SSM Parameter Store.
 secretName: backstage-secrets
 
-# ConfigMap with the CA that signed Dex's certificate (key ca.crt). Needed only with a private CA such as the local one.
-caConfigMap: ""
-
-# Extra non-secret environment (e.g. LOCAL_SOURCE_HOST for the kind demo).
+# Extra non-secret environment variables.
 extraEnv: {}
 
 dex:
-  issuer: https://dex.platform-demo.test
+  issuer: https://dex.platform-demo.click
 
 persistence:
-  # Published TechDocs sites. kind's default StorageClass is used when empty.
+  # Published TechDocs sites. The cluster's default StorageClass is used when empty.
   size: 1Gi
   storageClass: ""
 postgres:

@@ -5,7 +5,7 @@ enforcePlatform: false
 
 actions:
   # Signature verification reads manifests from Docker Hub at every pod admission. Anonymous pulls are limited to 100 per hour
-  # per IP and a fresh `kind/up.sh` already uses most of them, so a throttled lookup is an ERROR and an enforcing policy turns
+  # per IP and a fresh cluster already uses most of them, so a throttled lookup is an ERROR and an enforcing policy turns
   # errors into denials (failurePolicy does not change that). Until a read-only Docker Hub token is configured
   # (verifyImages.pullSecret, see policies/README.md) this one policy only reports. Remove this line once it is.
   verify-images: Audit

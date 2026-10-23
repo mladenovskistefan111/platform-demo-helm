@@ -1,5 +1,5 @@
 # Hostnames are built from `domain`:  shop, grafana, argocd, hubble, backstage, dex . <domain>
-domain: platform-demo.test
+domain: platform-demo.click
 
 # Cilium registers this GatewayClass when gatewayAPI.enabled=true.
 gatewayClassName: cilium
@@ -9,8 +9,8 @@ gateway:
   namespace: gateway-system
   tlsSecretName: platform-tls        # kubernetes.io/tls Secret in gateway.namespace covering *.<domain>
 
-# Ports the Gateway listens on. Behind a cloud LoadBalancer use 80/443. With Cilium's host-network mode (kind, bare
-# metal without LB) the ports must be > 1023: see values-kind.yaml.
+# Ports the Gateway listens on. With Cilium's host-network mode (EKS: Terraform's ALB forwards to the nodes) they must be > 1023:
+# set them per environment (envs/<env>/values/platform-gateway.yaml). 80/443 only suit a Service of type LoadBalancer.
 listeners:
   http: 80
   https: 443

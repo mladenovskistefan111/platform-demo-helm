@@ -1,4 +1,4 @@
-# Lightweight profile for kind / minikube / a laptop:  helm install platform-demo . -f values-dev.yaml
+# Lightweight profile (one replica, no HPA/PDB):  helm install platform-demo . -f values-dev.yaml
 # Demo credentials only - never use them outside a throw-away cluster.
 x-dev: &dev
   replicaCount: 1

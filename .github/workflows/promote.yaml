@@ -3,7 +3,8 @@ name: Promote
 # Moves what is in the PREVIOUS environment on main to the next one (stage <- dev, prod <- stage), through a pull request that
 # passes the same checks as any change. Started by a person: Actions -> Promote -> Run workflow.
 #
-#   app      a chart name (checkout-service, frontend, ...) or `all` (every app whose digest differs)
+#   app      one of the shop services (a dropdown) or `all` (every app whose digest differs). The list is checked against the
+#            workloads by .github/scripts/check-dispatch-apps.py in CI: add a service there when you add a workload.
 #   env      stage or prod
 #   version  X.Y.Z. Required for stage: it is recorded next to the digest (`# vX.Y.Z` on the image.digest line) and, after the merge,
 #            becomes the tag and GitHub Release <app>-vX.Y.Z of THIS repository (stage-release.yaml). For prod leave it empty: the
@@ -18,8 +19,9 @@ on:
   workflow_dispatch:
     inputs:
       app:
-        description: Chart name (checkout-service, frontend, ...) or all
-        type: string
+        description: The app to promote, or all (every app whose digest differs)
+        type: choice
+        options: [all, ad-service, cart-service, checkout-service, currency-service, email-service, frontend, payment-service, product-catalog-service, recommendation-service, shipping-service]
         required: true
       env:
         description: Target environment

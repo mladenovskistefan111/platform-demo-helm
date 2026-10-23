@@ -60,6 +60,7 @@ not `sha256:<64 hex>`, and CI verifies the cosign signature of every digest.
 1. Chart at the repository root (`<app>/`, thin over `platform-common`). Its name is the app name.
 2. One line `{ app: <app>, chart: <app>, namespace: <env namespace> }` in `envs/<env>/workloads.yaml` of each environment that runs it.
 3. `envs/<env>/values/<app>.yaml` with `image.tag` and `image.digest` (signed image) for each of those environments.
+   Then add the app to the `app` options of `.github/workflows/promote.yaml` (after `all`) and `rollback.yaml`, alphabetically: the dropdowns of the browser workflows. `check-dispatch-apps.py` fails the pull request with the exact line to paste.
 4. `policies/values.yaml`: the name in `identity.workloads`, and a new image repository in `images.workload.repositories`. The Kyverno check in CI fails otherwise.
 5. The catalog entry in the app's own repository (`argocd/app-name: <env>-<app>`, see the portal documentation).
 

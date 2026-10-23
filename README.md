@@ -73,14 +73,12 @@ helm upgrade --install platform-demo . -n platform-demo \
   --set product-catalog-db.auth.existingSecret=product-catalog-db-credentials        # HA defaults, needs metrics-server
 ```
 
-Prerequisites either way: the service images on Docker Hub (pinned by digest, built/scanned/signed by each service's `release.yaml`), and HTTPS in front of the frontend (its cookies are `Secure`).
+Prerequisites either way: the service images on Docker Hub (pinned by digest, built, scanned and signed by the shared publish workflow), and HTTPS in front of the frontend (its cookies are `Secure`).
 The services export telemetry to `alloy.monitoring.svc.cluster.local` (or `--set global.monitoring.*`); no collector is deployed on the EKS cluster yet, so the exports fail and only add log noise.
 
 ## Promote an image
 
-1. A service repo tagged `vX.Y.Z` and its `release.yaml` published `mladenovskistefan/<svc>:X.Y.Z` (signed). Get the digest: `docker buildx imagetools inspect mladenovskistefan/<svc>:X.Y.Z` (the `Digest:` line).
-2. Open a PR changing `image.tag` and `image.digest` (and the `# vX.Y.Z` comment) in `envs/<env>/values/<svc>.yaml`. One file per app per environment: dev first, stage and prod take the same digest later. The app name is the chart directory name (`<svc>`) and the Argo CD Application is `<env>-<svc>`.
-3. CI renders the app exactly as Argo CD will, validates it (kubeconform with CRD schemas, Trivy config) and **verifies the digest is signed by one of our pipelines**. Merge -> Argo CD syncs within ~2 minutes.
+From the browser, no typing of digests: **Actions -> Promote -> Run workflow**, pick the **app** (dropdown), the **env** (`stage` takes what dev runs, `prod` takes what stage runs) and, for stage, the **version** `X.Y.Z`. A pull request is opened, checked and auto-merged; `prod` first waits for the reviewer of the GitHub environment `prod`. **Actions -> Rollback** does the same in reverse (app, env, `previous` / `latest` / a digest / a git SHA). dev is filled automatically when an app repository merges to `main`. Details, the required check (`gate`) and the signer policy: [docs/promote.md](docs/promote.md).
 
 ## What each chart provides
 
@@ -134,7 +132,7 @@ helm dependency update <chart>                               # after changing pl
 
 Charts and the library share a version contract: bump `platform-common` and re-run `helm dependency update` in every chart that should pick it up (Argo CD runs `helm dependency build` itself; `Chart.lock` files are committed, the vendored `charts/*.tgz` are not).
 
-The pull-request pipeline (`.github/workflows/ci.yaml`, nothing runs on push): helm lint of every chart, render of the umbrella and of every shop and platform app, kubeconform (strict, Kubernetes + CRD schemas incl. Cilium/Gateway API/Argo CD), Trivy config scan (rendered charts must be clean), a cosign gate (every deployed `mladenovskistefan/*` image pinned by digest and signed), **Kyverno policy tests** (unit tests for every policy, then every rendered workload/add-on of every environment is evaluated against the policies, so a chart change that admission would refuse fails the PR), secret scan and workflow lint.
+The pull-request pipeline (`.github/workflows/ci.yaml`, nothing runs on push): helm lint of every chart, render of the umbrella and of every shop and platform app, kubeconform (strict, Kubernetes + CRD schemas incl. Cilium/Gateway API/Argo CD), Trivy config scan (rendered charts must be clean), a cosign gate (every deployed `mladenovskistefan/*` image pinned by digest and signed by an allowed workflow, `verifyImages.signers`), **Kyverno policy tests** (unit tests for every policy, then every rendered workload/add-on of every environment is evaluated against the policies, so a chart change that admission would refuse fails the PR), the promotion policy, secret scan and workflow lint. All jobs run in parallel on every pull request and a final **`gate`** job, the only required status check, fails when any of them failed, was cancelled or was skipped without a reason ([docs/promote.md](docs/promote.md)).
 
 ## Status
 

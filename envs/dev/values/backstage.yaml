@@ -10,6 +10,6 @@ config:
 # Sandboxed runtime on AWS (RuntimeClass gvisor, created with the cluster add-ons). Kyverno also mutates it from a namespace label.
 runtimeClassName: gvisor
 images:
-  # First release: tag v0.1.0 of platform-demo-backstage, then a pull request sets the released digest here (like every service).
-  # The image must trust the RDS CA bundle (NODE_EXTRA_CA_CERTS): see docs/secrets.md, "What the portal image needs".
-  backstage: { repository: mladenovskistefan/platform-demo-backstage, tag: 0.1.0, digest: "" }
+  # Released image (platform-demo-backstage v0.1.1, signed). A promotion pull request changes tag and digest here, like for every service.
+  # The image carries the Amazon RDS CA bundle (NODE_EXTRA_CA_CERTS), see docs/secrets.md, "What the portal image needs".
+  backstage: { repository: mladenovskistefan/platform-demo-backstage, tag: 0.1.1, digest: sha256:34cef574900363ca8b14ea0018f43f7b1f2c0a8e7e2e48a59108918dbc0db97b }

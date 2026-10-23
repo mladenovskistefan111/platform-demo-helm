@@ -7,7 +7,7 @@ clusterName: platform-demo
 images:
   # tag = which version, digest = what actually runs. The digest of a released image is promoted here by a pull request, like
   # every other service (platform-demo-backstage/README.md, "First release"). Empty = the tag is used as it is.
-  backstage: { repository: mladenovskistefan/platform-demo-backstage, tag: 0.1.0, digest: "" }
+  backstage: { repository: mladenovskistefan/platform-demo-backstage, tag: 0.1.1, digest: "" }
   pullPolicy: IfNotPresent
 
 # Which configuration layers the image loads (see platform-demo-backstage/app-config*.yaml). `app-config.github.yaml` is the

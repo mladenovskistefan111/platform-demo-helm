@@ -72,7 +72,7 @@ verifyImages:
   unsigned:
     - name: product-catalog-db
       imagePrefix: "mladenovskistefan/product-catalog-db@sha256:"
-      reason: Temporary hand-built image of the in-cluster PostgreSQL (the shop's database stays in the cluster for now); same allow-list entry as in the Helm CI.
+      reason: Hand-built, unsigned image of the shop's in-cluster PostgreSQL (it stays in the cluster for now); same allow-list entry as in the Helm CI.
 
 # Who may change network policy and traffic-exposing objects (CiliumNetworkPolicy, NetworkPolicy, Gateway, HTTPRoute) in
 # policed namespaces: Argo CD, Kyverno's own generator, the cluster's housekeeping controllers and cluster admins.

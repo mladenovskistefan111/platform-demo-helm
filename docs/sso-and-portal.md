@@ -18,7 +18,7 @@ Argo CD trust Dex. The portal's own documentation, with the architecture and the
 | Dex chart | `dex/` (ConfigMap, Deployment, Service, RBAC; state in Kubernetes custom resources, not `memory`) |
 | Portal chart | `backstage/` (portal on Amazon RDS PostgreSQL, read-only RBAC, PVC for the published docs) |
 | Per-environment values | `envs/dev/values/dex.yaml`, `envs/dev/values/backstage.yaml` |
-| Secrets | `external-secrets-config/` (ExternalSecrets), `gitops/apps/application-external-secrets.yaml`, [Secrets](secrets.md) |
+| Secrets | `external-secrets-config/` (ExternalSecrets), `gitops/layers/security/application-external-secrets.yaml`, [Secrets](secrets.md) |
 | Routes | `platform-gateway/values.yaml` (`dex`, `backstage`) |
 | Argo CD login | `gitops/argocd/values.yaml` (`oidc.config`, `admin.enabled: "false"`, RBAC) |
 | Kyverno | `policies/values.yaml`: `backstage` and `sso` are platform-scope namespaces; image allow-list has Dex and the portal image |
@@ -35,7 +35,7 @@ flowchart LR
   DEX -->|"OAuth"| GH["GitHub"]
 ```
 
-Browsers and pods use the same public URL for Dex, with a publicly trusted certificate terminated at the Gateway, so no pod needs a
+Browsers and pods use the same public URL for Dex, with a publicly trusted certificate (ACM) terminated at the ALB, so no pod needs a
 private CA and the issuer is identical for everyone, which OIDC requires. Dex signs people in with their GitHub account (only members of
 the `platform-boutique` organisation) and passes their teams on as groups.
 

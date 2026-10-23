@@ -16,9 +16,9 @@ flowchart LR
 
 | Piece | File |
 |---|---|
-| Operator (chart `external-secrets` 2.11.0) | `gitops/apps/application-external-secrets.yaml` |
-| Stores and ExternalSecrets | chart `external-secrets-config/`, `gitops/apps/application-external-secrets-config.yaml` |
-| Restart on change (chart `reloader` 2.2.18) | `gitops/apps/application-reloader.yaml` |
+| Operator (chart `external-secrets` 2.11.0) | `gitops/layers/security/application-external-secrets.yaml` |
+| Stores and ExternalSecrets | chart `external-secrets-config/`, `gitops/layers/security/application-external-secrets-config.yaml` |
+| Restart on change (chart `reloader` 2.2.18) | `gitops/layers/security/application-reloader.yaml` |
 | Project (sources, namespaces, cluster kinds) | `gitops/apps/appproject-secrets.yaml` |
 
 The operator runs as the ServiceAccount `external-secrets` in the namespace `external-secrets`, both created by Terraform; the account

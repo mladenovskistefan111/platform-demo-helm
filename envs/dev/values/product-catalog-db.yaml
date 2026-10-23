@@ -1,3 +1,5 @@
-# Credentials: the Secret product-catalog-db-credentials, created by External Secrets (external-secrets-config/templates/shop.yaml) from Parameter Store.
+# Credentials: the Secret product-catalog-db-credentials, created by External Secrets (external-secrets-config/templates/shop.yaml) from
+# Parameter Store. product-catalog-db stays an in-cluster StatefulSet for now (the shop moves to another cluster later); the only RDS
+# database is Backstage's.
 auth:
   existingSecret: product-catalog-db-credentials

@@ -23,7 +23,7 @@ Sync waves order the Applications *inside* one parent: Argo CD syncs a wave, wai
 | Layer / wave | Application | Project | What it is | Why here |
 |---|---|---|---|---|
 | bootstrap / 0 | `cluster-bootstrap` | `bootstrap` | Chart `cluster-bootstrap/` with `envs/dev/values/cluster-bootstrap.yaml`: every Namespace with its Pod Security, Kyverno-profile and gVisor labels (wave -10), RuntimeClass `gvisor` (-5), and the Job `spire-cilium-restart` (5) | Namespaces must exist, labelled, before secrets, policies or apps; the RuntimeClass before the first sandboxed pod; Cilium must restart once SPIRE runs, before any pod needs mutual authentication |
-| security / 0 | `external-secrets` | `secrets` | External Secrets Operator (provided by the `feat/backstage-rds-eso` branch) | CRDs and webhook first |
+| security / 0 | `external-secrets` | `secrets` | External Secrets Operator (chart 2.11.0) | CRDs and webhook first |
 | security / 10 | `external-secrets-config`, `reloader` | `secrets` | ClusterSecretStore + ExternalSecrets (`sso/dex-secrets`, `backstage/backstage-secrets`, `argocd/argocd-oidc`, `kyverno/dockerhub-read`, the shop's DB credentials), Reloader | An ExternalSecret is Healthy only once its Secret exists, so the next wave cannot start without them |
 | security / 20 | `kyverno` | `security` | Kyverno 1.19 (chart 3.9.1), 2 admission replicas on the host network | After `kyverno/dockerhub-read` exists ("Kyverno waits for it") |
 | security / 30 | `dev-policies` | `security` | Chart `policies/` (enforcing: workload scope; reporting: platform scope), incl. the gVisor mutation | Needs the Kyverno CRDs |

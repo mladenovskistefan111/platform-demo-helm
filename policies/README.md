@@ -64,7 +64,7 @@ Failure policy is derived from the action: `Fail` when a policy can deny, `Ignor
 
 A `PolicyException` lives in the **`kyverno` namespace** (Kyverno ignores exceptions from anywhere else, `features.policyExceptions.namespace`), so nobody can exempt their own workload from inside its namespace. They are rendered from `values.yaml`:
 
-- `verifyImages.unsigned`: images that are knowingly unsigned. Today only `product-catalog-db` (a temporary hand-built image of the shop's in-cluster PostgreSQL, kept for now; the same entry is allow-listed by name in the Helm CI). Matched with **CEL on the pod** (label `app.kubernetes.io/name` *and* every container image starting with `mladenovskistefan/product-catalog-db@sha256:`).
+- `verifyImages.unsigned`: images that are knowingly unsigned. Today only `product-catalog-db` (a hand-built image of the shop's in-cluster PostgreSQL, which stays a StatefulSet for now; the same entry is allow-listed by name in the Helm CI). Matched with **CEL on the pod** (label `app.kubernetes.io/name` *and* every container image starting with `mladenovskistefan/product-catalog-db@sha256:`).
 - `exceptions`: anything else. Today: the Argo CD application controller has no liveness probe (upstream removed it on purpose).
 
 Do not use `spec.images` in an exception: Kyverno before 1.19.1 ignored it (the exception then disabled verification for the *whole pod*), and matching on CEL is explicit anyway. Every exception needs a `reason`.
@@ -108,7 +108,7 @@ Offline tests cannot see the admission request, so `pd-protect-network-policy`, 
 - the policy reads Docker Hub with the read-only token in the Secret `kyverno/dockerhub-read` (`verifyImages.pullSecret`). External Secrets creates it from Parameter Store (`/platform-demo/dockerhub/username|token`, see the infra repository's `docs/secrets.md`); the GitOps order installs Kyverno only after that Secret exists. The Secret never goes into Git;
 - the policy is enforced in dev. If a lookup misbehaves on a first deploy, demote only this policy while debugging: `actions: { verify-images: Audit }` in `envs/dev/values/policies.yaml`.
 
-Verified before (2026-10-17, on the former laptop cluster): all deployed service images verify; an image without a valid signature is denied (`image signature verification failed`); the `product-catalog-db` exception admits only that image under its own label. **Not yet verified on EKS.**
+Expected behaviour (from the unit tests and the earlier checks on the former local cluster, which no longer exists): all deployed service images verify; an image without a valid signature is denied (`image signature verification failed`); the `product-catalog-db` exception admits only that image under its own label. **Not yet verified on EKS.**
 
 ## Gotchas found building this
 

@@ -7,6 +7,8 @@ platform-common/          library chart (templates only): Deployment, StatefulSe
 platform-gateway/         Gateway (Cilium GatewayClass, plain HTTP on 8080 behind the ALB) and HTTPRoutes: shop, argocd, hubble, backstage, dex
 cluster-bootstrap/        namespaces with their labels (Pod Security, Kyverno profile, gVisor), RuntimeClass gvisor, the one-off SPIRE/Cilium restart Job
 platform-network-policies/ default-deny and allow rules (CiliumNetworkPolicy) for argocd, sso, backstage, gateway-system
+external-secrets-config/  ClusterSecretStores and ExternalSecrets (AWS SSM Parameter Store / Secrets Manager -> Kubernetes Secrets)
+dex/, backstage/          SSO provider (Dex) and the developer portal (Backstage on RDS); deployed as add-ons from envs/dev/addons.yaml
 monitoring/               vendored upstream charts (unchanged; not deployed by envs/dev yet)
 platform-demo/            umbrella chart: `helm install` of the whole app without Argo CD (values-dev/prod.yaml)
 envs/dev/                 workloads.yaml, addons.yaml, values/<app>.yaml, values/common.yaml, values/cluster-bootstrap.yaml (the namespace list)

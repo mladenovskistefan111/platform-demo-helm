@@ -174,8 +174,8 @@ jobs:
       # platform-demo-workflows release. Anything pushed by hand fails the promotion.
       - name: Verify digests and signatures
         env:
-          # product-catalog-db is a temporary, hand-built image (kept as a StatefulSet for now); when it is replaced
-          # by RDS this entry goes away together with the chart. Do not add other images here.
+          # product-catalog-db is a hand-built, unsigned image that stays a StatefulSet in the cluster for now (the shop moves to
+          # another cluster later); this entry goes away if it is ever replaced by a signed image. Do not add other images here.
           UNSIGNED_ALLOWLIST: product-catalog-db
         run: |
           images=$(grep -hE '^\s+image:' rendered/*.yaml | sed -E 's/^\s*image:\s*//; s/"//g' | sort -u | grep '^mladenovskistefan/' || true)
@@ -192,7 +192,7 @@ jobs:
                  "$ref" > /dev/null 2>&1; then
               echo "signed    $ref"
             elif [[ " $UNSIGNED_ALLOWLIST " == *" $name "* ]]; then
-              echo "::warning::$ref has no valid signature (allow-listed: $name is a temporary, hand-built image)"
+              echo "::warning::$ref has no valid signature (allow-listed: $name is a hand-built image)"
             else
               echo "::error::$ref has no valid signature from our pipelines"; status=1
             fi

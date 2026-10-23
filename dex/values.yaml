@@ -1,5 +1,5 @@
-# Dex (https://dexidp.io). Install into the `sso` namespace; clients reach it as https://dex.<domain> (TLS terminates at the Gateway,
-# for browsers and pods alike).
+# Dex (https://dexidp.io). Install into the `sso` namespace; browsers and pods both reach it as https://dex.<domain> (the Gateway
+# terminates TLS with a publicly trusted certificate, so the pods need no private CA).
 
 domain: platform-demo.click
 # Must be identical everywhere: it is the `iss` of every token and what the clients fetch /.well-known from.
@@ -10,9 +10,15 @@ images:
   dex: { repository: ghcr.io/dexidp/dex, tag: v2.46.0-distroless, digest: sha256:8ba378a122bf44478f29f9999fc92c658d047ea75f539a4c98af8b6db0da3589 }
   pullPolicy: IfNotPresent
 
-# Secret with the client secrets and the connector credentials. Never in Git: External Secrets fills it from AWS SSM Parameter Store
-# (keys: BACKSTAGE_CLIENT_SECRET, ARGOCD_CLIENT_SECRET, GRAFANA_CLIENT_SECRET, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET).
+# Secret with the client secrets and the connector credentials. Never in Git: External Secrets Operator creates it from AWS SSM
+# (external-secrets-config/, docs/secrets.md lists every key). Keys: GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET and the
+# `secretEnv` of every enabled client below.
 secretName: dex-secrets
+# Reloader annotation: a changed Secret restarts Dex (gitops/apps/application-reloader.yaml). Harmless without reloader.
+reloadOnSecretChange: true
+# Optional: Secret (type kubernetes.io/tls) with a certificate for dex.<domain>, served on 5557/443 to pods that resolve the issuer
+# to the Service (a private CA setup). Empty = plain HTTP behind the Gateway only, which is what a public certificate needs.
+tlsSecretName: ""
 
 # Storage of auth requests and tokens: `kubernetes` (custom resources in this namespace; Dex creates the CRDs itself, rbac.yaml
 # grants that) survives restarts. Not `memory`: Dex v2.46.0 deadlocked on the first refresh token with it when a local-password
@@ -29,7 +35,8 @@ github:
     - name: platform-boutique
   # Secret keys GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET in `secretName`.
 
-# Applications that trust Dex. Each needs its secret in `secretName` under the key named in secretEnv.
+# Applications that trust Dex. Each needs its secret in `secretName` under the key named in secretEnv. `enabled: false` leaves a
+# client out (and its secret key is then not needed).
 clients:
   - id: backstage
     name: Backstage
@@ -43,6 +50,7 @@ clients:
       - https://argocd.platform-demo.click/auth/callback
   - id: grafana
     name: Grafana
+    enabled: false   # only when Grafana is deployed (then SSM /platform-demo/sso/grafana-client-secret too)
     secretEnv: GRAFANA_CLIENT_SECRET
     redirectURIs:
       - https://grafana.platform-demo.click/login/generic_oauth

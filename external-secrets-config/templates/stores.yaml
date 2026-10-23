@@ -1,0 +1,24 @@
+# Two stores, one per AWS service. Authentication: the operator's own ServiceAccount token (IRSA); the IAM role can read SSM
+# /platform-demo/* and the RDS master secret, nothing else.
+{{- range $name, $service := dict "aws-parameter-store" "ParameterStore" "aws-secrets-manager" "SecretsManager" }}
+---
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: {{ $name }}
+  labels: {{- include "esc.labels" $ | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  conditions:
+    - namespaces: {{ toJson $.Values.allowedNamespaces }}
+  provider:
+    aws:
+      service: {{ $service }}
+      region: {{ $.Values.region }}
+      auth:
+        jwt:
+          serviceAccountRef:
+            name: {{ $.Values.operator.serviceAccountName }}
+            namespace: {{ $.Values.operator.namespace }}
+{{- end }}

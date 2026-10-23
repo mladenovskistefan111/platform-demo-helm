@@ -17,6 +17,11 @@ metadata:
   name: backstage
   namespace: {{ .Release.Namespace }}
   labels: {{- include "backstage.labels" (dict "name" "backstage" "root" .) | nindent 4 }}
+  {{- if .Values.reloadOnSecretChange }}
+  annotations:
+    # stakater/reloader restarts the pod when this Secret changes (RDS rotates the password every 7 days).
+    secret.reloader.stakater.com/reload: {{ .Values.secretName | quote }}
+  {{- end }}
 spec:
   replicas: 1
   strategy: { type: Recreate }
@@ -33,6 +38,9 @@ spec:
         checksum/overlay: {{ toYaml . | sha256sum | trunc 16 | quote }}
         {{- end }}
     spec:
+      {{- with .Values.runtimeClassName }}
+      runtimeClassName: {{ . }}
+      {{- end }}
       serviceAccountName: backstage
       # The Kubernetes plugin reads the cluster with this ServiceAccount's token (read-only ClusterRole in rbac.yaml).
       automountServiceAccountToken: true
@@ -60,6 +68,10 @@ spec:
           envFrom:
             - configMapRef: { name: backstage-env }
           env:
+            # RDS endpoint and credentials; the Secret is created by External Secrets Operator (see values.yaml, secretName).
+            - { name: POSTGRES_HOST, valueFrom: { secretKeyRef: { name: {{ .Values.secretName }}, key: POSTGRES_HOST } } }
+            - { name: POSTGRES_PORT, valueFrom: { secretKeyRef: { name: {{ .Values.secretName }}, key: POSTGRES_PORT } } }
+            - { name: POSTGRES_USER, valueFrom: { secretKeyRef: { name: {{ .Values.secretName }}, key: POSTGRES_USER } } }
             - { name: POSTGRES_PASSWORD, valueFrom: { secretKeyRef: { name: {{ .Values.secretName }}, key: POSTGRES_PASSWORD } } }
             - { name: BACKSTAGE_OIDC_CLIENT_SECRET, valueFrom: { secretKeyRef: { name: {{ .Values.secretName }}, key: BACKSTAGE_OIDC_CLIENT_SECRET } } }
             - { name: AUTH_SESSION_SECRET, valueFrom: { secretKeyRef: { name: {{ .Values.secretName }}, key: AUTH_SESSION_SECRET } } }

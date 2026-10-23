@@ -1,0 +1,47 @@
+# sso/dex-secrets: the GitHub OAuth App and the client secrets Dex shares with Backstage and Argo CD (dex/templates/deployment.yaml
+# loads the whole Secret as environment: the keys are the `secretEnv` names of dex/values.yaml).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ .Values.dex.secretName }}
+  namespace: {{ .Values.dex.namespace }}
+  labels: {{- include "esc.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  refreshInterval: {{ .Values.refreshInterval }}
+  secretStoreRef: { kind: ClusterSecretStore, name: aws-parameter-store }
+  target:
+    name: {{ .Values.dex.secretName }}
+    creationPolicy: Owner
+  data:
+    {{- include "esc.ssm" (dict "root" . "key" "GITHUB_CLIENT_ID" "path" "github-oauth/client-id") | nindent 4 }}
+    {{- include "esc.ssm" (dict "root" . "key" "GITHUB_CLIENT_SECRET" "path" "github-oauth/client-secret") | nindent 4 }}
+    {{- include "esc.ssm" (dict "root" . "key" "BACKSTAGE_CLIENT_SECRET" "path" "sso/backstage-client-secret") | nindent 4 }}
+    {{- include "esc.ssm" (dict "root" . "key" "ARGOCD_CLIENT_SECRET" "path" "sso/argocd-client-secret") | nindent 4 }}
+    {{- if .Values.grafana.enabled }}
+    {{- include "esc.ssm" (dict "root" . "key" "GRAFANA_CLIENT_SECRET" "path" "sso/grafana-client-secret") | nindent 4 }}
+    {{- end }}
+---
+# argocd/argocd-oidc: the same Argo CD client secret, in the form Argo CD dereferences ($argocd-oidc:clientSecret in oidc.config).
+# Argo CD only reads Secrets labelled app.kubernetes.io/part-of=argocd.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ .Values.argocd.oidcSecretName }}
+  namespace: {{ .Values.argocd.namespace }}
+  labels: {{- include "esc.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  refreshInterval: {{ .Values.refreshInterval }}
+  secretStoreRef: { kind: ClusterSecretStore, name: aws-parameter-store }
+  target:
+    name: {{ .Values.argocd.oidcSecretName }}
+    creationPolicy: Owner
+    template:
+      metadata:
+        labels:
+          app.kubernetes.io/part-of: argocd
+  data:
+    {{- include "esc.ssm" (dict "root" . "key" "clientSecret" "path" "sso/argocd-client-secret") | nindent 4 }}

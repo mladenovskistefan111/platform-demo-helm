@@ -53,7 +53,6 @@ images:
       - index.docker.io/grafana/pyroscope
       - index.docker.io/grafana/tempo
       - ghcr.io/dexidp/dex
-      - index.docker.io/library/postgres
       - index.docker.io/mladenovskistefan/platform-demo-backstage
       - quay.io/argoproj/argocd
       - ecr-public.aws.com/docker/library/redis

@@ -1,4 +1,5 @@
-# Backstage (image built from platform-boutique/platform-demo-backstage). Install into the `backstage` namespace.
+# Backstage (image built from platform-demo-backstage). Install into the `backstage` namespace.
+# Environment-specific values (domain, cluster name, Dex issuer, catalog layers) are set in envs/<env>/values/backstage.yaml.
 
 domain: platform-demo.click
 clusterName: platform-demo
@@ -7,34 +8,56 @@ images:
   # tag = which version, digest = what actually runs. The digest of a released image is promoted here by a pull request, like
   # every other service (platform-demo-backstage/README.md, "First release"). Empty = the tag is used as it is.
   backstage: { repository: mladenovskistefan/platform-demo-backstage, tag: 0.1.0, digest: "" }
-  postgres: { repository: postgres, tag: 17-alpine, digest: sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24 }
   pullPolicy: IfNotPresent
 
 # Which configuration layers the image loads (see platform-demo-backstage/app-config*.yaml). `app-config.github.yaml` is the
-# production catalog (needs GITHUB_TOKEN).
+# catalog: every repository of the GitHub organisation plus its users and teams (needs GITHUB_TOKEN in the Secret).
 config:
-  files: [app-config.yaml, app-config.production.yaml]
+  files: [app-config.yaml, app-config.production.yaml, app-config.github.yaml]
   # Extra configuration layered last, without rebuilding the image (a map in app-config syntax, rendered into a ConfigMap).
-  # E.g. to switch the Grafana cards off when Grafana is not deployed.
   overlay: {}
 
-# Secret with POSTGRES_PASSWORD, BACKSTAGE_OIDC_CLIENT_SECRET, AUTH_SESSION_SECRET, GRAFANA_TOKEN and
-# (production) GITHUB_TOKEN. Never in Git: External Secrets fills it from AWS SSM Parameter Store.
+# Secret with POSTGRES_HOST, POSTGRES_PORT, POSTGRES_USER, POSTGRES_PASSWORD, BACKSTAGE_OIDC_CLIENT_SECRET, AUTH_SESSION_SECRET,
+# GITHUB_TOKEN and (optional) GRAFANA_TOKEN. Never in Git: External Secrets Operator creates it from AWS (external-secrets-config/,
+# docs/secrets.md). Until it exists the pod stays in CreateContainerConfigError, which the kubelet retries by itself: no crash loop.
 secretName: backstage-secrets
 
-# Extra non-secret environment variables.
+# The database is an Amazon RDS PostgreSQL instance outside the cluster; host, port, user and the (RDS-rotated) password come from
+# the Secret above. The connection is always encrypted: PGSSLMODE is read by node-postgres when the app-config sets no `ssl`.
+# `require` = TLS verified against the trusted CAs; the image must trust the RDS CA bundle (NODE_EXTRA_CA_CERTS, see docs/secrets.md).
+database:
+  sslMode: require
+
+# ConfigMap with an extra CA (key ca.crt) for NODE_EXTRA_CA_CERTS. Empty = the image's own value (the AWS RDS bundle baked into it).
+caConfigMap: ""
+
+# Extra non-secret environment.
 extraEnv: {}
 
 dex:
   issuer: https://dex.platform-demo.click
 
+# Set to a RuntimeClass name (e.g. gvisor) to run the pod in a sandbox. Empty = the cluster default; on AWS a Kyverno mutation
+# also sets it from a namespace label, and a value here is the same thing stated explicitly.
+runtimeClassName: ""
+
+# Annotation read by stakater/reloader (gitops/apps/application-reloader.yaml): a changed Secret restarts the pod, which is how
+# the RDS password rotation (every 7 days) reaches Backstage. Harmless when reloader is not installed.
+reloadOnSecretChange: true
+
+# CiliumNetworkPolicy for the pod (off by default: Cilium is the CNI on the cluster, but the namespace has no default-deny).
+networkPolicy:
+  enabled: false
+  # RDS lives in the VPC: allowed on 5432 only.
+  rdsCidr: 10.0.0.0/16
+  rdsPort: 5432
+  # Further CiliumNetworkPolicy egress rules (raw objects), e.g. Grafana if it is deployed.
+  extraEgress: []
+
 persistence:
   # Published TechDocs sites. The cluster's default StorageClass is used when empty.
   size: 1Gi
   storageClass: ""
-postgres:
-  size: 1Gi
 
 resources:
   backstage: { requests: { cpu: 100m, memory: 384Mi }, limits: { memory: 1Gi } }
-  postgres: { requests: { cpu: 50m, memory: 96Mi }, limits: { memory: 256Mi } }

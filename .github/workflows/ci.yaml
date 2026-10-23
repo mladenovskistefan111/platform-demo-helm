@@ -77,6 +77,8 @@ jobs:
           helm template platform-demo ./platform-demo -f platform-demo/values-prod.yaml \
             --set product-catalog-db.auth.existingSecret=s > rendered/umbrella-prod.yaml
           helm template platform-gateway ./platform-gateway > rendered/gateway.yaml
+          # Not an environment add-on (its own Argo CD Application, project `secrets`): rendered here so kubeconform checks the ExternalSecrets.
+          helm template external-secrets-config ./external-secrets-config > rendered/external-secrets-config.yaml
           # Every workload and add-on of every environment, rendered the way the ApplicationSets do.
           python3 .github/scripts/render-envs.py rendered
           wc -l rendered/*.yaml

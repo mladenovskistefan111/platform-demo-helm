@@ -1,0 +1,36 @@
+# backstage/backstage-secrets: everything the Backstage Deployment reads (backstage/templates/backstage.yaml).
+# Until the Secret exists the pod waits in CreateContainerConfigError (the kubelet retries by itself, no crash loop);
+# the operator retries with back-off while a parameter is still missing.
+{{- $r := .Values.rds }}
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ .Values.backstage.secretName }}
+  namespace: {{ .Values.backstage.namespace }}
+  labels: {{- include "esc.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  refreshInterval: {{ .Values.refreshInterval }}
+  secretStoreRef: { kind: ClusterSecretStore, name: aws-parameter-store }
+  target:
+    name: {{ .Values.backstage.secretName }}
+    creationPolicy: Owner
+  data:
+    # RDS endpoint (non-secret String parameters written by Terraform)
+    {{- include "esc.ssm" (dict "root" . "key" "POSTGRES_HOST" "path" (printf "%s/host" $r.ssmPath)) | nindent 4 }}
+    {{- include "esc.ssm" (dict "root" . "key" "POSTGRES_PORT" "path" (printf "%s/port" $r.ssmPath)) | nindent 4 }}
+    {{- include "esc.ssm" (dict "root" . "key" "POSTGRES_USER" "path" (printf "%s/username" $r.ssmPath)) | nindent 4 }}
+    # RDS-managed master password (Secrets Manager, JSON {username,password}); rotated every 7 days
+    - secretKey: POSTGRES_PASSWORD
+      sourceRef:
+        storeRef: { kind: ClusterSecretStore, name: aws-secrets-manager }
+      remoteRef:
+        key: {{ $r.masterSecretId | quote }}
+        property: password
+    {{- include "esc.ssm" (dict "root" . "key" "BACKSTAGE_OIDC_CLIENT_SECRET" "path" "sso/backstage-client-secret") | nindent 4 }}
+    {{- include "esc.ssm" (dict "root" . "key" "AUTH_SESSION_SECRET" "path" "backstage/auth-session-secret") | nindent 4 }}
+    {{- include "esc.ssm" (dict "root" . "key" "GITHUB_TOKEN" "path" "github/token") | nindent 4 }}
+    {{- if .Values.grafana.enabled }}
+    {{- include "esc.ssm" (dict "root" . "key" "GRAFANA_TOKEN" "path" "grafana/backstage-token") | nindent 4 }}
+    {{- end }}

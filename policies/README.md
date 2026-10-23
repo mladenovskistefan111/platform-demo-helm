@@ -18,7 +18,7 @@ All policies use the CEL policy types of `policies.kyverno.io/v1` (`ValidatingPo
 
 ## Catalog
 
-Scope **workload** = `platform-demo` (strict, enforced). Scope **platform** = `monitoring`, `argocd`, `backstage`, `sso` (third-party stacks, the developer portal and Dex: only the generic checks, reported but never enforced unless `enforcePlatform: true`; their images - Dex, PostgreSQL, the portal - are on the platform allow-list in `values.yaml`). Namespaces are named in `values.yaml` (`scopes`), not selected by label, so a namespace cannot opt out by being relabelled.
+Scope **workload** = `platform-demo` (strict, enforced). Scope **platform** = `monitoring`, `argocd`, `backstage`, `sso` (third-party stacks, the developer portal and Dex: only the generic checks, reported but never enforced unless `enforcePlatform: true`; their images - Dex and the portal - are on the platform allow-list in `values.yaml`). Namespaces are named in `values.yaml` (`scopes`), not selected by label, so a namespace cannot opt out by being relabelled.
 
 | Policy | Kind | Scope | Rule |
 |---|---|---|---|

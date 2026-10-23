@@ -5,7 +5,7 @@ Argo CD trust Dex. The portal's own documentation, with the architecture and the
 `platform-demo-backstage` site; this page is what the Helm repository contributes.
 
 <div class="pd-facts" markdown>
-<div><span>Add-ons</span><strong>dex, backstage</strong><small>envs/dev/addons.yaml</small></div>
+<div><span>Add-ons</span><strong>dex, backstage</strong><small>clusters/main/addons.yaml</small></div>
 <div><span>Namespaces</span><strong>sso, backstage</strong><small>platform scope for Kyverno (audit)</small></div>
 <div><span>Hosts</span><strong>dex, backstage</strong><small>.platform-demo.click, via the Gateway</small></div>
 <div><span>Secrets</span><strong>Never in Git</strong><small>AWS SSM, see <a href="../secrets/">Secrets</a></small></div>
@@ -17,7 +17,7 @@ Argo CD trust Dex. The portal's own documentation, with the architecture and the
 |---|---|
 | Dex chart | `dex/` (ConfigMap, Deployment, Service, RBAC; state in Kubernetes custom resources, not `memory`) |
 | Portal chart | `backstage/` (portal on Amazon RDS PostgreSQL, read-only RBAC, PVC for the published docs) |
-| Per-environment values | `envs/dev/values/dex.yaml`, `envs/dev/values/backstage.yaml` |
+| Per-cluster values | `clusters/main/values/dex.yaml`, `clusters/main/values/backstage.yaml` |
 | Secrets | `external-secrets-config/` (ExternalSecrets), `gitops/layers/security/application-external-secrets.yaml`, [Secrets](secrets.md) |
 | Routes | `platform-gateway/values.yaml` (`dex`, `backstage`) |
 | Argo CD login | `gitops/argocd/values.yaml` (`oidc.config`, `admin.enabled: "false"`, RBAC) |
@@ -59,6 +59,6 @@ the portal starts as soon as External Secrets has created the Secret.
 
 ## The real GitHub login
 
-`github.enabled: true` is the default (`envs/dev/values/dex.yaml`; the chart refuses to render without it). The OAuth App of the
+`github.enabled: true` is the default (`clusters/main/values/dex.yaml`; the chart refuses to render without it). The OAuth App of the
 organisation (callback `https://dex.platform-demo.click/callback`) provides the id and secret that go to SSM
 (`/platform-demo/github-oauth/*`). See the portal documentation (*Single sign-on → Going live with GitHub*).

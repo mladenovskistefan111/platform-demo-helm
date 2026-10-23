@@ -5,10 +5,10 @@ The target is an **EKS** cluster whose infrastructure (VPC, cluster, Cilium, nod
 
 1. Terraform creates the cluster with Cilium (CNI, kube-proxy replacement, Gateway API in host-network mode) and the ALB in front of it.
 2. Terraform also installs Argo CD (chart `argo/argo-cd`, bootstrap values only) and creates the objects of `gitops/bootstrap/root.yaml` (the AppProject `platform-admin` and the Application `platform-root`); nothing is applied by hand.
-   From there Argo CD creates the projects, the ApplicationSets, itself (from `gitops/argocd/values.yaml`), Kyverno and the policies, and one Application per entry of `envs/dev/`. See [GitOps](gitops.md).
+   From there Argo CD creates the projects, the ApplicationSets, itself (from `gitops/argocd/values.yaml`), Kyverno and the policies, and one Application per entry of `clusters/main/addons.yaml` and of `envs/<env>/workloads.yaml`. See [GitOps](gitops.md) and [Environments](environments.md).
 3. Secrets are not in Git. They live in AWS Systems Manager Parameter Store (`/platform-demo/...`) and reach the cluster through External Secrets
    (see `secrets.md` in infra-terraform).
-4. The hostnames are `argocd`, `backstage`, `dex`, `hubble` and `shop` under `platform-demo.click` (`grafana` is a disabled route: no Grafana is deployed); people sign in with GitHub through Dex.
+4. The hostnames are `argocd`, `backstage`, `dex`, `hubble` and `shop` under `platform-demo.click`, plus `dev.shop` and `stage.shop` for the other two shop environments (`grafana` is a disabled route: no Grafana is deployed); people sign in with GitHub through Dex. DNS records and the certificate are Terraform's (see [Environments](environments.md)).
 
 ## Without Argo CD
 

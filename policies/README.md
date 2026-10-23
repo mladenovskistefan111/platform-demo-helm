@@ -1,6 +1,6 @@
 # Kyverno policies
 
-Admission control for the cluster: what Cilium network policy and Pod Security cannot say. Kyverno **1.19.1** (chart 3.9.1) installed by Argo CD (`../gitops/layers/security/application-kyverno.yaml`, values in `../gitops/kyverno/values.yaml`); this chart (`policies/`) holds the policies, deployed by `../gitops/layers/security/application-policies.yaml` with `../envs/<env>/values/policies.yaml`. On EKS the admission controller runs on the host network (port 9443): the pod network is an overlay the control plane cannot reach.
+Admission control for the cluster: what Cilium network policy and Pod Security cannot say. Kyverno **1.19.1** (chart 3.9.1) installed by Argo CD (`../gitops/layers/security/application-kyverno.yaml`, values in `../gitops/kyverno/values.yaml`); this chart (`policies/`) holds the policies, deployed by `../gitops/layers/security/application-policies.yaml` with `../clusters/main/values/policies.yaml` (the policies are cluster-wide, so they live with the cluster, not with a shop environment). On EKS the admission controller runs on the host network (port 9443): the pod network is an overlay the control plane cannot reach.
 
 All policies use the CEL policy types of `policies.kyverno.io/v1` (`ValidatingPolicy`, `MutatingPolicy`, `ImageValidatingPolicy`, `GeneratingPolicy`). The old `ClusterPolicy` API is deprecated upstream and not used.
 
@@ -18,7 +18,7 @@ All policies use the CEL policy types of `policies.kyverno.io/v1` (`ValidatingPo
 
 ## Catalog
 
-Scope **workload** = `platform-demo` (strict, enforced). Scope **platform** = `argocd`, `backstage`, `sso` (third-party stacks, the developer portal and Dex: only the generic checks, reported but never enforced unless `enforcePlatform: true`; their images - Dex, PostgreSQL, the portal - are on the platform allow-list in `values.yaml`). Namespaces are named in `values.yaml` (`scopes`), not selected by label, so a namespace cannot opt out by being relabelled.
+Scope **workload** = the three shop namespaces `platform-demo` (prod), `stage-platform-demo` and `dev-platform-demo` (strict, enforced; they are the same in every respect, see [Environments](../docs/environments.md)). Scope **platform** = `argocd`, `backstage`, `sso` (third-party stacks, the developer portal and Dex: only the generic checks, reported but never enforced unless `enforcePlatform: true`; their images - Dex, PostgreSQL, the portal - are on the platform allow-list in `values.yaml`). Namespaces are named in `values.yaml` (`scopes`), not selected by label, so a namespace cannot opt out by being relabelled. The flip side: a namespace missing from `scopes.workload` gets no policy at all, so `render-envs.py` fails the pull request when an environment's namespace is not listed (and `tests/pod-identity` documents the effect).
 
 | Policy | Kind | Scope | Rule |
 |---|---|---|---|
@@ -44,7 +44,7 @@ Mutations only touch Pods (autogen off), so Deployments stay exactly as rendered
 
 ## Modes and rolling out
 
-`defaultAction` is `Audit` in the chart (reports and kubectl warnings, blocks nothing). `envs/dev/values/policies.yaml` sets `Deny` for the workload scope; the platform scope stays Audit. Override one policy with `actions: { <name without pd->: Audit|Deny }`.
+`defaultAction` is `Audit` in the chart (reports and kubectl warnings, blocks nothing). `../clusters/main/values/policies.yaml` sets `Deny` for the workload scope; the platform scope stays Audit. Override one policy with `actions: { <name without pd->: Audit|Deny }`.
 
 **Rolling out a new policy or scope**
 
@@ -71,7 +71,7 @@ Do not use `spec.images` in an exception: Kyverno before 1.19.1 ignored it (the 
 
 ## Break-glass
 
-`kubectl exec`, `attach` and `kubectl debug` into `platform-demo` pods are refused. For an incident:
+`kubectl exec`, `attach` and `kubectl debug` into pods of the shop namespaces (`platform-demo`, `stage-platform-demo`, `dev-platform-demo`) are refused. For an incident:
 
 ```bash
 kubectl -n platform-demo annotate pod <pod> platform.demo/break-glass=true
@@ -85,7 +85,7 @@ Annotating a pod needs `update` on pods, i.e. the same trust level as exec, but 
 
 | Layer | How | What it proves |
 |---|---|---|
-| Unit tests | `kyverno test policies/tests` (57 cases: identity, image source, hardening, guardrails, mutation, sandbox). Render first: `helm template policies policies -f envs/dev/values/policies.yaml -s templates/<file>.yaml > policies/.rendered/<file>.yaml` | each rule passes good and rejects bad fixtures |
+| Unit tests | `kyverno test policies/tests` (70 cases: identity, image source, hardening, guardrails, mutation, sandbox). Render first: `helm template policies policies -f clusters/main/values/policies.yaml -s templates/<file>.yaml > policies/.rendered/<file>.yaml` | each rule passes good and rejects bad fixtures |
 | Rendered environments | `.github/scripts/policy-check.sh <dir with render-envs.py output>` (CI job *Kyverno policy tests*) | every workload/add-on that Argo CD would deploy satisfies the policies that can be evaluated offline; a chart change that admission would refuse fails the PR |
 | Live | `policies/tests/live/adversarial.sh` (30 cases, needs cluster-admin; dry-runs and impersonation, creates nothing) | the policies as deployed: identity theft, foreign/unpinned images, NodePort, foreign HTTPRoute, a non-admin editing CiliumNetworkPolicy, namespace Pod Security, the gVisor mutation and its opt-out, exec/debug with and without break-glass; each denial is asserted to come from the intended policy |
 
@@ -93,7 +93,7 @@ Offline tests cannot see the admission request, so `pd-protect-network-policy`, 
 
 ## gVisor sandbox
 
-`pd-sandbox-gvisor` (MutatingPolicy) adds `runtimeClassName: gvisor` to Pods created in namespaces labelled `platform.demo/sandbox=gvisor`. The label is set in **one** place: the namespace list in `../envs/<env>/values/cluster-bootstrap.yaml` (`sandbox: true|false`); the RuntimeClass (`handler: runsc`) comes from the same chart, the `runsc` runtime from the node image (Terraform).
+`pd-sandbox-gvisor` (MutatingPolicy) adds `runtimeClassName: gvisor` to Pods created in namespaces labelled `platform.demo/sandbox=gvisor`. The label is set in **one** place: the namespace list in `../clusters/main/values/cluster-bootstrap.yaml` (`sandbox: true|false`); the RuntimeClass (`handler: runsc`) comes from the same chart, the `runsc` runtime from the node image (Terraform).
 
 - **Opt a namespace out:** `sandbox: false` there (the label disappears; running pods keep their runtime until restarted).
 - **Opt a pod out:** pod annotation `platform.demo/sandbox: disabled` (charts: `podAnnotations`). Pods that already name a `runtimeClassName`, use `hostNetwork`/`hostPID`/`hostIPC`, are privileged or mount a `hostPath` are skipped automatically: they cannot run in a user-space kernel.
@@ -106,7 +106,7 @@ Offline tests cannot see the admission request, so `pd-protect-network-policy`, 
 
 - background re-verification is off (`evaluation.background.enabled: false`);
 - the policy reads Docker Hub with the read-only token in the Secret `kyverno/dockerhub-read` (`verifyImages.pullSecret`). External Secrets creates it from Parameter Store (`/platform-demo/dockerhub/username|token`, see the infra repository's `docs/secrets.md`); the GitOps order installs Kyverno only after that Secret exists. The Secret never goes into Git;
-- the policy is enforced in dev. If a lookup misbehaves on a first deploy, demote only this policy while debugging: `actions: { verify-images: Audit }` in `envs/dev/values/policies.yaml`.
+- the policy is enforced in every shop environment. If a lookup misbehaves on a first deploy, demote only this policy while debugging: `actions: { verify-images: Audit }` in `clusters/main/values/policies.yaml`.
 
 Expected behaviour (from the unit tests and the earlier checks on the former local cluster, which no longer exists): all deployed service images verify; an image without a valid signature is denied (`image signature verification failed`); the `product-catalog-db` exception admits only that image under its own label. **Not yet verified on EKS.**
 
@@ -124,3 +124,7 @@ Expected behaviour (from the unit tests and the earlier checks on the former loc
 ## Adding a workload
 
 Add its name to `identity.workloads` (and a ServiceAccount of the same name; the charts do that), and, if it uses a new image repository, to `images.workload.repositories`. The Helm CI fails the PR otherwise.
+
+## Adding a shop environment
+
+Add its namespace to `scopes.workload` in `values.yaml` and give it the same labels as the other shop namespaces in `../clusters/main/values/cluster-bootstrap.yaml`. Nothing else changes: the policies match namespaces, not environments, and the workload names (`identity.workloads`) and image repositories are the same in every environment. Add a fixture for the new namespace next to the existing ones in `tests/` (see `tests/pod-identity` for dev and stage). `render-envs.py` fails the pull request while the namespace is missing from the list.

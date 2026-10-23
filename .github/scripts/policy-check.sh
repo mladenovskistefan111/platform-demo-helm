@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # Kyverno policy checks, run in CI and locally:  .github/scripts/policy-check.sh <dir with render-envs.py output>
 #   1. unit tests (policies/tests): every policy has pass/fail fixtures
-#   2. the manifests Argo CD would deploy are evaluated against the policies, so a chart change that a policy would refuse
-#      at admission fails the pull request instead of failing the sync.
+#   2. the manifests Argo CD would deploy (every shop environment and the platform, side by side) are evaluated against the policies,
+#      so a chart change that a policy would refuse at admission fails the pull request instead of failing the sync.
 # Needs: helm, kyverno (CLI), python3 with PyYAML. Run from the repository root.
 set -euo pipefail
 rendered="${1:?usage: policy-check.sh <rendered-dir>}"
-env_values=envs/dev/values/policies.yaml
+cluster_values=clusters/main/values/policies.yaml   # the policies are cluster-wide: one cluster today
 out=policies/.rendered
 rm -rf "$out"; mkdir -p "$out"
 
 for t in identity images hardening guardrails mutation; do
-  helm template policies policies -f "$env_values" -s "templates/$t.yaml" > "$out/$t.yaml"
+  helm template policies policies -f "$cluster_values" -s "templates/$t.yaml" > "$out/$t.yaml"
 done
 
 # The Kyverno CLI cannot evaluate a namespaceSelector on a custom label (platform.demo/sandbox) offline: test the sandbox mutation

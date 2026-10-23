@@ -4,7 +4,7 @@
 # (user, subresource) or the signature check. Run it after changing a policy:   policies/tests/live/adversarial.sh
 # Needs cluster-admin. Prints PASS/FAIL per case and exits 1 on any FAIL.
 set -u
-NS=${NS:-platform-demo}
+NS=${NS:-platform-demo}   # prod shop namespace; run it again with NS=stage-platform-demo / NS=dev-platform-demo
 fails=0
 GOOD=$(kubectl -n "$NS" get deploy checkout-service -o jsonpath='{.spec.template.spec.containers[0].image}')
 DBIMG=$(kubectl -n "$NS" get sts product-catalog-db -o jsonpath='{.spec.template.spec.containers[0].image}')

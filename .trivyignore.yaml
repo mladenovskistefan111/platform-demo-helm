@@ -2,7 +2,7 @@
 misconfigurations:
   - id: KSV-0109
     paths:
-      - "**/env-dev-dex.yaml"
+      - "**/cluster-main-dex.yaml"
     statement: >-
       False positive. Trivy matches the word `clientSecret` in Dex's ConfigMap, but the value is `$GITHUB_CLIENT_SECRET`: a reference to an
       environment variable that Dex expands at start from the Secret (secretRef in the Deployment). No secret is stored in the ConfigMap, and

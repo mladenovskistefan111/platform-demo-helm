@@ -38,7 +38,6 @@ spec:
             - secretRef: { name: {{ .Values.secretName }} }
           ports:
             - { name: http, containerPort: 5556 }
-            - { name: https, containerPort: 5557 }
             - { name: telemetry, containerPort: 5558 }
           readinessProbe:
             httpGet: { path: /healthz/ready, port: telemetry }
@@ -56,13 +55,10 @@ spec:
             capabilities: { drop: [ALL] }
           volumeMounts:
             - { name: config, mountPath: /etc/dex/config.yaml, subPath: config.yaml, readOnly: true }
-            - { name: tls, mountPath: /etc/dex/tls, readOnly: true }
             - { name: tmp, mountPath: /tmp }
       volumes:
         - name: config
           configMap: { name: dex }
-        - name: tls
-          secret: { secretName: {{ .Values.tlsSecretName }} }
         - { name: tmp, emptyDir: { sizeLimit: 16Mi } }
 ---
 apiVersion: v1
@@ -76,7 +72,5 @@ spec:
     app.kubernetes.io/name: dex
     app.kubernetes.io/instance: {{ .Release.Name }}
   ports:
-    # 80: what the Gateway forwards browsers to (TLS already terminated).
-    # 443: what pods reach as https://dex.<domain> through the CoreDNS rewrite; Dex terminates TLS itself.
+    # 80: what the Gateway forwards to (TLS is terminated at the Gateway; browsers and pods both use https://dex.<domain>).
     - { name: http, port: 80, targetPort: http }
-    - { name: https, port: 443, targetPort: https }

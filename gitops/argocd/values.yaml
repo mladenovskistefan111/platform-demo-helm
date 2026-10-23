@@ -1,7 +1,7 @@
 # Argo CD (chart argo/argo-cd). Used twice: `helm install` at bootstrap, then by gitops/apps/application-argocd.yaml so that
 # Argo CD manages and upgrades itself from this file.
 global:
-  domain: argocd.platform-demo.test
+  domain: argocd.platform-demo.click
 
 configs:
   params:
@@ -11,15 +11,14 @@ configs:
     # Gateway API routes and StatefulSets, whose fields the API server defaults, stay OutOfSync forever.
     controller.diff.server.side: true
   cm:
-    url: https://argocd.platform-demo.test
-    # Poll Git every 2 minutes (default 3). Webhooks are not reachable from a laptop.
+    url: https://argocd.platform-demo.click
+    # Poll Git every 2 minutes (default 3).
     timeout.reconciliation: 120s
     # Single sign-on through Dex (platform-demo-helm/dex), the same provider as Backstage and Grafana. People sign in with GitHub;
-    # their teams arrive as groups. The client secret is a Secret labelled part-of=argocd (kind/up.sh creates it, never in Git).
-    # TLS to Dex is verified against the CA mounted below (a private CA locally; a public one on AWS needs neither).
+    # their teams arrive as groups. The client secret is a Secret labelled part-of=argocd (External Secrets creates it from AWS SSM Parameter Store, never in Git).
     oidc.config: |
       name: Dex
-      issuer: https://dex.platform-demo.test
+      issuer: https://dex.platform-demo.click
       clientID: argocd
       clientSecret: $argocd-oidc:clientSecret
       requestedScopes: [openid, profile, email, groups]
@@ -48,15 +47,6 @@ controller:
   # is on. Kyverno's pd-require-probes-platform knows this deviation (policies/values.yaml, `exceptions`).
 server:
   resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 384Mi } }
-  # Trust the CA that signed Dex's certificate. SSL_CERT_DIR replaces the system roots for this process, which is fine: the server
-  # only talks to Dex and to the Kubernetes API (whose CA comes from the pod's ServiceAccount, not from here).
-  # On a cluster with a publicly trusted certificate for Dex delete these three blocks.
-  env:
-    - { name: SSL_CERT_DIR, value: /etc/platform-demo-ca }
-  volumes:
-    - { name: platform-demo-ca, configMap: { name: platform-demo-ca } }
-  volumeMounts:
-    - { name: platform-demo-ca, mountPath: /etc/platform-demo-ca, readOnly: true }
 repoServer:
   resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 512Mi } }
 applicationSet:

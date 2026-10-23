@@ -1,20 +1,18 @@
-# Dex (https://dexidp.io). Install into the `sso` namespace; clients reach it as https://dex.<domain> (the Gateway terminates TLS
-# for browsers, a CoreDNS rewrite plus the https listener below serves the pods - see kind/README.md, "Single sign-on").
+# Dex (https://dexidp.io). Install into the `sso` namespace; clients reach it as https://dex.<domain> (TLS terminates at the Gateway,
+# for browsers and pods alike).
 
-domain: platform-demo.test
+domain: platform-demo.click
 # Must be identical everywhere: it is the `iss` of every token and what the clients fetch /.well-known from.
-issuer: https://dex.platform-demo.test
+issuer: https://dex.platform-demo.click
 
 images:
   # tag = which version, digest = what actually runs (Kyverno requires a digest). Bump both together.
   dex: { repository: ghcr.io/dexidp/dex, tag: v2.46.0-distroless, digest: sha256:8ba378a122bf44478f29f9999fc92c658d047ea75f539a4c98af8b6db0da3589 }
   pullPolicy: IfNotPresent
 
-# Secret with the client secrets and the connector credentials. Never in Git: kind/up.sh creates it
-# (kind/sso-secrets.sh documents every key); on AWS External Secrets fills it.
+# Secret with the client secrets and the connector credentials. Never in Git: External Secrets fills it from AWS SSM Parameter Store
+# (keys: BACKSTAGE_CLIENT_SECRET, ARGOCD_CLIENT_SECRET, GRAFANA_CLIENT_SECRET, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET).
 secretName: dex-secrets
-# Secret (type kubernetes.io/tls) with the certificate for dex.<domain>; the pods' own trust of the issuer. Created by kind/up.sh.
-tlsSecretName: dex-tls
 
 # Storage of auth requests and tokens: `kubernetes` (custom resources in this namespace; Dex creates the CRDs itself, rbac.yaml
 # grants that) survives restarts. Not `memory`: Dex v2.46.0 deadlocked on the first refresh token with it when a local-password
@@ -24,7 +22,7 @@ storage:
   type: kubernetes
 
 # People sign in with their GitHub account; only members of these organisations may. Their teams come through as
-# groups (`<org>:<team-slug>`). Needs an OAuth App (callback https://dex.<domain>/callback): see README.md.
+# groups (`<org>:<team-slug>`). Needs an OAuth App (callback https://dex.<domain>/callback).
 github:
   enabled: true
   orgs:
@@ -37,17 +35,17 @@ clients:
     name: Backstage
     secretEnv: BACKSTAGE_CLIENT_SECRET
     redirectURIs:
-      - https://backstage.platform-demo.test/api/auth/oidc/handler/frame
+      - https://backstage.platform-demo.click/api/auth/oidc/handler/frame
   - id: argocd
     name: Argo CD
     secretEnv: ARGOCD_CLIENT_SECRET
     redirectURIs:
-      - https://argocd.platform-demo.test/auth/callback
+      - https://argocd.platform-demo.click/auth/callback
   - id: grafana
     name: Grafana
     secretEnv: GRAFANA_CLIENT_SECRET
     redirectURIs:
-      - https://grafana.platform-demo.test/login/generic_oauth
+      - https://grafana.platform-demo.click/login/generic_oauth
 
 # How long a login lasts. Applications keep their own session after the code exchange; this bounds token refresh.
 expiry:

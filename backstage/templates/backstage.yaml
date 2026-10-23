@@ -84,9 +84,6 @@ spec:
           volumeMounts:
             - { name: data, mountPath: /data }
             - { name: tmp, mountPath: /tmp }
-            {{- if .Values.caConfigMap }}
-            - { name: ca, mountPath: /etc/platform-demo-ca, readOnly: true }
-            {{- end }}
             {{- if .Values.config.overlay }}
             - { name: overlay, mountPath: /etc/backstage-overlay, readOnly: true }
             {{- end }}
@@ -94,10 +91,6 @@ spec:
         - name: data
           persistentVolumeClaim: { claimName: backstage-data }
         - { name: tmp, emptyDir: { sizeLimit: 256Mi } }
-        {{- if .Values.caConfigMap }}
-        - name: ca
-          configMap: { name: {{ .Values.caConfigMap }} }
-        {{- end }}
         {{- if .Values.config.overlay }}
         - name: overlay
           configMap: { name: backstage-config-overlay }

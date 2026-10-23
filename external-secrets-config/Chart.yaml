@@ -1,0 +1,9 @@
+apiVersion: v2
+name: external-secrets-config
+description: >-
+  What External Secrets Operator (installed by gitops/apps/application-external-secrets.yaml) does in this cluster: two
+  ClusterSecretStores on AWS (SSM Parameter Store, Secrets Manager) and the ExternalSecrets that create the Kubernetes Secrets of
+  Backstage, Dex, Argo CD (OIDC) and Kyverno (Docker Hub pull secret). No secret value is in Git, only the SSM paths.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

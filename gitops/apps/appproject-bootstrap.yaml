@@ -1,0 +1,23 @@
+# First layer: namespaces, RuntimeClass, and the one-off Job that restarts Cilium once SPIRE runs.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: bootstrap
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  description: Namespaces, the gVisor RuntimeClass and the SPIRE/Cilium restart Job. Source is this repository only.
+  sourceRepos:
+    - https://github.com/platform-boutique/platform-demo-helm.git
+  destinations:
+    - { name: in-cluster, namespace: kube-system }      # the Job, its ServiceAccount, the Role on cilium / cilium-operator
+    - { name: in-cluster, namespace: cilium-spire }     # the Role that lets the Job watch spire-server / spire-agent
+  clusterResourceWhitelist:
+    - { group: "", kind: Namespace }
+    - { group: node.k8s.io, kind: RuntimeClass }
+  namespaceResourceWhitelist:
+    - { group: batch, kind: Job }
+    - { group: "", kind: ServiceAccount }
+    - { group: rbac.authorization.k8s.io, kind: Role }
+    - { group: rbac.authorization.k8s.io, kind: RoleBinding }

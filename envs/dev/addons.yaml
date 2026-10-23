@@ -1,2 +1,5 @@
+# Platform add-ons deployed to the dev environment (chart = directory at the repo root; namespace must be declared in
+# values/cluster-bootstrap.yaml - CI checks that). One line adds an add-on.
 - { app: platform-gateway, chart: platform-gateway, namespace: gateway-system }
-- { app: monitoring-local, chart: monitoring-local, namespace: monitoring }
+- { app: dex,              chart: dex,              namespace: sso }
+- { app: backstage,        chart: backstage,        namespace: backstage }

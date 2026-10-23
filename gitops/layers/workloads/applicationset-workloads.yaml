@@ -1,0 +1,49 @@
+# One Application per (environment, workload). Adding a workload = one line in envs/<env>/workloads.yaml (its namespace must be declared in
+# envs/<env>/values/cluster-bootstrap.yaml). Promotion = a PR that changes image.digest in envs/<env>/values/<app>.yaml.
+# The whole layer is switched off by `[]` in envs/<env>/workloads.yaml. An entry may carry `cluster: <name>` (default in-cluster) for
+# the day the shop moves to its own cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: platform-workloads
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/platform-boutique/platform-demo-helm.git
+        revision: main
+        requeueAfterSeconds: 120
+        files:
+          - path: "envs/*/workloads.yaml"
+        values:
+          env: '{{ index .path.segments 1 }}'
+  template:
+    metadata:
+      name: '{{ .values.env }}-{{ .app }}'
+      labels:
+        app.kubernetes.io/part-of: platform-demo
+        platform.demo/env: '{{ .values.env }}'
+        platform.demo/kind: workload
+      finalizers: [resources-finalizer.argocd.argoproj.io]
+    spec:
+      project: workloads
+      source:
+        repoURL: https://github.com/platform-boutique/platform-demo-helm.git
+        targetRevision: main
+        path: '{{ .chart }}'
+        helm:
+          releaseName: '{{ .app }}'
+          ignoreMissingValueFiles: true
+          valueFiles:
+            - '../envs/{{ .values.env }}/values/common.yaml'
+            - '../envs/{{ .values.env }}/values/{{ .app }}.yaml'
+      destination: { name: '{{ index . "cluster" | default "in-cluster" }}', namespace: '{{ .namespace }}' }
+      syncPolicy:
+        automated: { prune: true, selfHeal: true }
+        # The namespace (restricted, workload profile, gVisor) is declared in envs/<env>/values/cluster-bootstrap.yaml, not created here.
+        syncOptions: [ServerSideApply=true, PruneLast=true]
+        retry:
+          limit: 6
+          backoff: { duration: 10s, factor: 2, maxDuration: 3m }

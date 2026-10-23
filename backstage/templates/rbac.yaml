@@ -1,0 +1,57 @@
+# What the portal may read in the cluster: workloads for the Kubernetes tab, Argo CD Applications, Kyverno policy reports and
+# policies, Cilium and Gateway objects. Read only, and no Secrets, no pods/exec, no pods/log.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backstage
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "backstage.labels" (dict "name" "backstage" "root" .) | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backstage-read
+  labels: {{- include "backstage.labels" (dict "name" "backstage" "root" .) | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: [pods, services, configmaps, limitranges, resourcequotas, replicationcontrollers, namespaces, nodes, events]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, replicasets, statefulsets, daemonsets]
+    verbs: [get, list, watch]
+  - apiGroups: [autoscaling]
+    resources: [horizontalpodautoscalers]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses, networkpolicies]
+    verbs: [get, list, watch]
+  - apiGroups: [batch]
+    resources: [jobs, cronjobs]
+    verbs: [get, list, watch]
+  - apiGroups: [metrics.k8s.io]
+    resources: [pods, nodes]
+    verbs: [get, list]
+  - apiGroups: [argoproj.io]
+    resources: [applications, applicationsets, appprojects]
+    verbs: [get, list, watch]
+  - apiGroups: [wgpolicyk8s.io]
+    resources: [policyreports, clusterpolicyreports]
+    verbs: [get, list, watch]
+  - apiGroups: [policies.kyverno.io]
+    resources: [validatingpolicies, mutatingpolicies, generatingpolicies, imagevalidatingpolicies]
+    verbs: [get, list, watch]
+  - apiGroups: [cilium.io]
+    resources: [ciliumnetworkpolicies, ciliumclusterwidenetworkpolicies]
+    verbs: [get, list, watch]
+  - apiGroups: [gateway.networking.k8s.io]
+    resources: [gateways, httproutes]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backstage-read
+  labels: {{- include "backstage.labels" (dict "name" "backstage" "root" .) | nindent 4 }}
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: backstage-read }
+subjects:
+  - { kind: ServiceAccount, name: backstage, namespace: {{ .Release.Namespace }} }

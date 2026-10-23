@@ -1,0 +1,60 @@
+{{- if not .Values.github.enabled }}
+{{- fail "Dex has no way for people to sign in: set github.enabled: true (and put the GitHub OAuth App's client ID and secret into the Secret)." }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dex
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "dex.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    issuer: {{ .Values.issuer }}
+    storage:
+      type: {{ .Values.storage.type }}
+      {{- if eq .Values.storage.type "kubernetes" }}
+      config:
+        inCluster: true
+      {{- end }}
+    web:
+      http: 0.0.0.0:5556
+      {{- if .Values.tlsSecretName }}
+      https: 0.0.0.0:5557
+      tlsCert: /etc/dex/tls/tls.crt
+      tlsKey: /etc/dex/tls/tls.key
+      {{- end }}
+    telemetry:
+      http: 0.0.0.0:5558
+    expiry:
+      idTokens: {{ .Values.expiry.idTokens }}
+      refreshTokens:
+        validIfNotUsedFor: {{ .Values.expiry.refreshTokens.validIfNotUsedFor }}
+        absoluteLifetime: {{ .Values.expiry.refreshTokens.absoluteLifetime }}
+    oauth2:
+      # The applications are ours; asking each person to approve "Argo CD wants your email" every time is noise.
+      skipApprovalScreen: true
+      responseTypes: [code]
+    {{- if .Values.github.enabled }}
+    connectors:
+      - type: github
+        id: github
+        name: GitHub
+        config:
+          clientID: $GITHUB_CLIENT_ID
+          clientSecret: $GITHUB_CLIENT_SECRET
+          redirectURI: {{ .Values.issuer }}/callback
+          orgs:
+            {{- toYaml .Values.github.orgs | nindent 12 }}
+          # Teams become groups named <org>:<team-slug>
+          teamNameField: slug
+    {{- end }}
+    staticClients:
+      {{- range .Values.clients }}
+      {{- if ne (toString .enabled) "false" }}
+      - id: {{ .id }}
+        name: {{ .name | quote }}
+        secretEnv: {{ .secretEnv }}
+        redirectURIs:
+          {{- tpl (toYaml .redirectURIs) $ | nindent 10 }}
+      {{- end }}
+      {{- end }}

@@ -1,0 +1,52 @@
+{{- if .Values.networkPolicy.enabled }}
+# Everything the portal talks to, and nothing else. Once a CiliumNetworkPolicy selects the pod, any egress not listed is denied.
+#   in:  the Cilium Gateway (browsers) on 7007
+#   out: DNS, the Kubernetes API (Kubernetes plugin), Argo CD's API, Hubble Relay, the internet on 443 (Dex through its public URL,
+#        GitHub catalog discovery) and the RDS PostgreSQL instance in the VPC on 5432. There is no in-cluster database any more.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: backstage
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "backstage.labels" (dict "name" "backstage" "root" .) | nindent 4 }}
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: backstage
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  ingress:
+    - fromEntities: [ingress]
+      toPorts:
+        - ports: [{ port: "7007", protocol: TCP }]
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports: [{ port: "53", protocol: UDP }, { port: "53", protocol: TCP }]
+          rules:
+            dns: [{ matchPattern: "*" }]
+    - toEntities: [kube-apiserver]
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": argocd
+            app.kubernetes.io/name: argocd-server
+      toPorts:
+        - ports: [{ port: "8080", protocol: TCP }]
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            k8s-app: hubble-relay
+      toPorts:
+        - ports: [{ port: "4245", protocol: TCP }]
+    - toEntities: [world]
+      toPorts:
+        - ports: [{ port: "443", protocol: TCP }]
+    - toCIDR: [{{ .Values.networkPolicy.rdsCidr | quote }}]
+      toPorts:
+        - ports: [{ port: {{ .Values.networkPolicy.rdsPort | quote }}, protocol: TCP }]
+    {{- with .Values.networkPolicy.extraEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

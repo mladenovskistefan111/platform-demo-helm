@@ -1,5 +1,5 @@
-# Hostnames are built from `domain`:  shop.<domain>, grafana.<domain>, argocd.<domain>, hubble.<domain>
-domain: platform-demo.test
+# Hostnames are built from `domain`:  shop, grafana, argocd, hubble, backstage, dex . <domain>
+domain: platform-demo.click
 
 # Cilium registers this GatewayClass when gatewayAPI.enabled=true.
 gatewayClassName: cilium
@@ -7,16 +7,29 @@ gatewayClassName: cilium
 gateway:
   name: platform-gateway
   namespace: gateway-system
-  tlsSecretName: platform-tls        # kubernetes.io/tls Secret in gateway.namespace covering *.<domain>
 
-# Ports the Gateway listens on. Behind a cloud LoadBalancer use 80/443. With Cilium's host-network mode (kind, bare
-# metal without LB) the ports must be > 1023: see values-kind.yaml.
+# Ports the Gateway listens on. Cilium runs it in host-network mode (no LoadBalancer Service): the ports are bound on every node, so
+# they must be > 1023. `http` must equal Terraform's `gateway_port` (the ALB's target group forwards to it).
 listeners:
-  http: 80
-  https: 443
+  http: 8080
+  https: 8443      # only used when tls.enabled
 
+# TLS. On AWS it ends at the ALB (ACM certificate, port 80 is redirected to 443 there), so the cluster needs no certificate and the
+# Gateway speaks plain HTTP. Set enabled: true to add an HTTPS listener with this Secret and turn the HTTP listener into a redirect.
+tls:
+  enabled: false
+  secretName: platform-tls     # kubernetes.io/tls Secret in gateway.namespace covering *.<domain>
+
+# Every route sets this request header. The ALB sends X-Forwarded-Proto: https, but Cilium's Envoy rewrites it to the scheme of ITS
+# connection (http), and applications that set Secure cookies or build absolute URLs (Argo CD, Backstage, Dex, the shop) need to
+# see https. Empty = do not touch the header (use when TLS ends at this Gateway).
+forwardedProto: https
+
+# One HTTPRoute per entry, in the namespace of the Service it points to. `enabled: false` drops the route (its Route 53 record can stay).
 routes:
-  shop:    { namespace: platform-demo, service: frontend,      port: 80,   host: shop }
-  grafana: { namespace: monitoring,    service: grafana,       port: 3000, host: grafana }
-  argocd:  { namespace: argocd,        service: argocd-server, port: 80,   host: argocd }
-  hubble:  { namespace: kube-system,   service: hubble-ui,     port: 80,   host: hubble }
+  shop:      { namespace: platform-demo, service: frontend,      port: 80,   host: shop }
+  grafana:   { namespace: monitoring,    service: grafana,       port: 3000, host: grafana, enabled: false }   # no Grafana on this cluster
+  argocd:    { namespace: argocd,        service: argocd-server, port: 80,   host: argocd }
+  hubble:    { namespace: kube-system,   service: hubble-ui,     port: 80,   host: hubble }
+  backstage: { namespace: backstage,     service: backstage,     port: 80,   host: backstage }
+  dex:       { namespace: sso,           service: dex,           port: 80,   host: dex }

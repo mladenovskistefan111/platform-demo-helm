@@ -1,10 +1,10 @@
 # platform-demo-helm
 
-Everything that is deployed: the Helm charts for the platform-demo application (10 services, PostgreSQL, Redis), the Gateway API entry point, a local monitoring stack, and the **GitOps configuration** that makes Argo CD deploy them. This repository is the single source of truth for what runs in each environment; the service repositories only build and publish images.
+Everything that is deployed: the Helm charts for the platform-demo application (10 services, PostgreSQL, Redis), the Gateway API entry point, and the **GitOps configuration** that makes Argo CD deploy them. This repository is the single source of truth for what runs in each environment; the service repositories only build and publish images.
 
 Context for everything below lives in the [docs repo](https://github.com/platform-boutique/platform-demo-docs): the master [`README.md`](https://github.com/platform-boutique/platform-demo-docs/blob/main/README.md) (architecture, wiring, observability contract, CI/CD model, gotchas) and the session handoff [`HANDOFF.md`](https://github.com/platform-boutique/platform-demo-docs/blob/main/HANDOFF.md).
 
-> `product-catalog-db` is a **temporary** chart/image for local testing. On AWS the database is RDS and that chart (plus its allow-list entry in `.github/workflows/ci.yaml`) is deleted.
+> `product-catalog-db` is a **temporary** chart/image (kept as a StatefulSet for now). The target database is RDS, and then that chart (plus its allow-list entry in `.github/workflows/ci.yaml`) is deleted.
 
 ## How it fits together
 
@@ -12,13 +12,13 @@ Context for everything below lives in the [docs repo](https://github.com/platfor
 service repos  --release tag-->  Docker Hub (signed image, digest)
                                         |  PR: bump image.digest in envs/<env>/values/<app>.yaml
                                         v
-platform-demo-helm  (this repo, main)  <--- Argo CD polls --- ApplicationSets (gitops/apps)
+platform-demo-helm  (this repo, main)  <--- Argo CD polls --- app-of-apps layers (gitops/apps, gitops/layers)
    charts + envs/ + gitops/                                      |
                                                                   v
                                                   one Application per (env, app) -> cluster
 ```
 
-- **Charts** (`<service>/`, `platform-common/`, `platform-gateway/`, `monitoring-local/`) describe *how* something is deployed.
+- **Charts** (`<service>/`, `platform-common/`, `platform-gateway/`, `dex/`, `backstage/`) describe *how* something is deployed.
 - **`envs/<env>/`** describes *what* runs in an environment: `workloads.yaml` / `addons.yaml` (lists) and `values/<app>.yaml` (image digest, per-env settings). **Promotion = a pull request that changes a digest.**
 - **`gitops/`** is Argo CD's own configuration: install values, the root Application, projects, the two ApplicationSets and the Kyverno Applications. See [`gitops/README.md`](gitops/README.md).
 - **`policies/`** are the Kyverno admission policies (identity, images and signatures, pod hardening, exposure, break-glass, namespace baseline). See [`policies/README.md`](policies/README.md).
@@ -29,40 +29,46 @@ platform-demo-helm  (this repo, main)  <--- Argo CD polls --- ApplicationSets (g
 platform-common/          library chart (templates only): Deployment, StatefulSet, Service, HPA, PDB, NetworkPolicy and
                           CiliumNetworkPolicy (networkPolicy.type), probes, security context helpers
 <service>/                10 Deployments + product-catalog-db / cart-redis StatefulSets; thin charts over platform-common
-platform-gateway/         Gateway (Cilium GatewayClass), HTTP->HTTPS redirect and HTTPRoutes: shop, grafana, argocd, hubble
-monitoring-local/         single-replica Alloy, Mimir, Loki, Tempo, Pyroscope, Grafana for laptops (not for real clusters)
-monitoring/               vendored upstream charts (unchanged), for real clusters
-platform-demo/            umbrella chart: `helm install` of the whole app without Argo CD (values-dev/prod/kind.yaml)
-envs/dev/                 workloads.yaml, addons.yaml, values/<app>.yaml, values/common.yaml
-gitops/                   argocd/values.yaml, kyverno/values.yaml, bootstrap/root.yaml, apps/ (AppProjects, ApplicationSets, Argo CD and Kyverno Applications)
+platform-gateway/         Gateway (Cilium GatewayClass, plain HTTP on 8080 behind the ALB) and HTTPRoutes: shop, argocd, hubble, backstage, dex
+cluster-bootstrap/        namespaces with their labels (Pod Security, Kyverno profile, gVisor), RuntimeClass gvisor, the one-off SPIRE/Cilium restart Job
+platform-network-policies/ default-deny and allow rules (CiliumNetworkPolicy) for argocd, sso, backstage, gateway-system
+monitoring/               vendored upstream charts (unchanged; not deployed by envs/dev yet)
+platform-demo/            umbrella chart: `helm install` of the whole app without Argo CD (values-dev/prod.yaml)
+envs/dev/                 workloads.yaml, addons.yaml, values/<app>.yaml, values/common.yaml, values/cluster-bootstrap.yaml (the namespace list)
+gitops/                   app-of-apps: bootstrap/root.yaml (Terraform mirrors it), apps/ (AppProjects + one Application per layer), layers/{bootstrap,security,platform,workloads}/ (sync-wave ordered Applications and ApplicationSets), argocd/values.yaml, kyverno/values.yaml
 policies/                 Kyverno policies (CEL policy types) + tests; README explains each policy, rollout, exceptions, break-glass
-kind/                     up.sh / down.sh, cluster.yaml, cilium-values.yaml, make-tls.sh, README.md (runbook)
 .github/                  ci.yaml (PR gate), scripts/ (render-envs.py, policy-check.sh, inject-namespaces.py), CODEOWNERS, dependabot.yml
 ```
 
 Every service chart is ~6 tiny template files that call into `platform-common` plus a fully commented `values.yaml`, so behaviour is identical everywhere and a fix in the library reaches all charts.
 
-## Quick start (local, one command)
+## Deploy
 
-```bash
-kind/up.sh        # kind + Cilium + Gateway API + Argo CD, then Argo CD deploys the rest from Git (~10-15 min)
-kind/down.sh      # destroys the cluster
-```
+The target is an **EKS** cluster whose infrastructure (VPC, cluster, Cilium, nodes, ALB, DNS) is created by the
+[infra-terraform](https://github.com/platform-boutique/infra-terraform) repository. This repository is everything that runs *on* the cluster, and Argo CD applies it.
 
-Needs `docker`, `kind`, `kubectl`, `helm`, `openssl`, ~6 GB free RAM. The script prints the URLs and the hosts-file line (`shop|grafana|argocd|hubble.platform-demo.test`). Full explanation and troubleshooting: [`kind/README.md`](kind/README.md).
+1. Terraform creates the cluster with Cilium (CNI, kube-proxy replacement, Gateway API in host-network mode) and the ALB in front of it.
+2. Bootstrap Argo CD once: install the `argo/argo-cd` chart with `gitops/argocd/values.yaml`, then `kubectl apply -f gitops/bootstrap/root.yaml`.
+   From there Argo CD creates the projects, the ApplicationSets, itself, Kyverno and the policies, and one Application per entry of `envs/dev/`. See [`gitops/README.md`](gitops/README.md).
+3. Secrets are not in Git. They live in AWS Systems Manager Parameter Store (`/platform-demo/...`) and reach the cluster through External Secrets
+   (see `secrets.md` in infra-terraform).
+4. The hostnames are `argocd`, `backstage`, `grafana`, `dex`, `hubble` and `shop` under `platform-demo.click`; people sign in with GitHub through Dex.
 
-Without Argo CD (any cluster with a CNI that enforces NetworkPolicy):
+### Without Argo CD
+
+Any cluster with a CNI that enforces NetworkPolicy can run the application from the umbrella chart:
 
 ```bash
 kubectl create namespace platform-demo
 kubectl label ns platform-demo pod-security.kubernetes.io/enforce=restricted   # the charts comply
 cd platform-demo && helm dependency update
-helm upgrade --install platform-demo . -n platform-demo -f values-dev.yaml          # laptop profile, demo DB password
+helm upgrade --install platform-demo . -n platform-demo -f values-dev.yaml          # small profile, demo DB password
 helm upgrade --install platform-demo . -n platform-demo \
   --set product-catalog-db.auth.existingSecret=product-catalog-db-credentials        # HA defaults, needs metrics-server
 ```
 
-Prerequisites either way: the service images on Docker Hub (pinned by digest, built/scanned/signed by each service's `release.yaml`), the monitoring stack reachable at `alloy.monitoring.svc.cluster.local` (or `--set global.monitoring.*`), and HTTPS in front of the frontend (its cookies are `Secure`).
+Prerequisites either way: the service images on Docker Hub (pinned by digest, built/scanned/signed by each service's `release.yaml`), the monitoring
+stack reachable at `alloy.monitoring.svc.cluster.local` (or `--set global.monitoring.*`), and HTTPS in front of the frontend (its cookies are `Secure`).
 
 ## Promote an image
 
@@ -122,8 +128,8 @@ helm dependency update <chart>                               # after changing pl
 
 Charts and the library share a version contract: bump `platform-common` and re-run `helm dependency update` in every chart that should pick it up (Argo CD runs `helm dependency build` itself; `Chart.lock` files are committed, the vendored `charts/*.tgz` are not).
 
-The pull-request pipeline (`.github/workflows/ci.yaml`, nothing runs on push): helm lint of every chart, render of the umbrella and of every env app, kubeconform (strict, Kubernetes + CRD schemas incl. Cilium/Gateway API/Argo CD), Trivy config scan (app charts must be clean, `monitoring-local` is report-only), a cosign gate (every deployed `mladenovskistefan/*` image pinned by digest and signed), **Kyverno policy tests** (unit tests for every policy, then every rendered workload/add-on of every environment is evaluated against the policies, so a chart change that admission would refuse fails the PR), secret scan and workflow lint.
+The pull-request pipeline (`.github/workflows/ci.yaml`, nothing runs on push): helm lint of every chart, render of the umbrella and of every env app, kubeconform (strict, Kubernetes + CRD schemas incl. Cilium/Gateway API/Argo CD), Trivy config scan (rendered charts must be clean), a cosign gate (every deployed `mladenovskistefan/*` image pinned by digest and signed), **Kyverno policy tests** (unit tests for every policy, then every rendered workload/add-on of every environment is evaluated against the policies, so a chart change that admission would refuse fails the PR), secret scan and workflow lint.
 
-## Verified
+## Status
 
-2026-10-17 on a single-node kind cluster (Kubernetes 1.32) with **Cilium 1.20.2** (kube-proxy replacement, Gateway API, Hubble, SPIRE mutual authentication): `kind/up.sh` from scratch, 16 Argo CD Applications Synced/Healthy, browse -> cart -> checkout through the Cilium Gateway over HTTPS ("Your order is complete!"), telemetry from all ten services in Mimir/Tempo/Loki, default-deny proven with an intruder pod, mutual authentication proven with a new identity that cannot connect while SPIRE is down. Earlier (kubeadm-style kind, 3 nodes, metrics-server) verification of HPA/PDB/NetworkPolicy is in master README §8.5.
+The target is the EKS cluster created by [infra-terraform](https://github.com/platform-boutique/infra-terraform); the charts, policies and CI in this repository are rendered and checked on every pull request (helm lint, kubeconform, Trivy, cosign, Kyverno tests). Nothing here has been verified on EKS yet: the end-to-end run is still to be done and will be recorded here.

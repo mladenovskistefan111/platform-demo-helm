@@ -1,0 +1,29 @@
+# Namespaces (labels decide Pod Security, the Kyverno profile and the gVisor sandbox), the RuntimeClass `gvisor`, and the one-off Job that
+# restarts Cilium once SPIRE is up. Chart: cluster-bootstrap/, values: envs/dev/values/cluster-bootstrap.yaml.
+# Terraform already provides: Cilium (+ SPIRE, WireGuard), EBS CSI, the default StorageClass gp3, CoreDNS, the argocd and external-secrets
+# namespaces, the gVisor runtime on the nodes. Nothing here creates those.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cluster-bootstrap
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: bootstrap
+  source:
+    repoURL: https://github.com/platform-boutique/platform-demo-helm.git
+    targetRevision: main
+    path: cluster-bootstrap
+    helm:
+      releaseName: cluster-bootstrap
+      valueFiles:
+        - ../envs/dev/values/cluster-bootstrap.yaml
+  destination: { name: in-cluster, namespace: kube-system }
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [ServerSideApply=true]
+    retry:
+      limit: 8
+      backoff: { duration: 15s, factor: 2, maxDuration: 5m }

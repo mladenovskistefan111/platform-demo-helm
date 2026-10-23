@@ -59,3 +59,62 @@ spec:
   expression: >-
     has(object.metadata.labels) && 'app.kubernetes.io/name' in object.metadata.labels`
   "patch" `Object{ metadata: Object.metadata{ labels: { "backstage.io/kubernetes-id": object.metadata.labels["app.kubernetes.io/name"] } } }`) }}
+
+{{- /*
+gVisor sandbox: pods in namespaces labelled platform.demo/sandbox=gvisor run with runtimeClassName gvisor (RuntimeClass created by
+gitops cluster-bootstrap). Selected by the namespace LABEL on purpose (the label is set in one place, the cluster-bootstrap namespace
+list, and opting a namespace out is removing it there), unlike the other policies that name their namespaces. Skipped for pods that
+cannot run in a user-space kernel (host network/PID/IPC, privileged, hostPath), that already choose a runtime class, or that carry the
+opt-out annotation. Fail-closed (see values.yaml): a missing mutation must not mean a silently unsandboxed pod.
+*/ -}}
+{{- if .Values.sandbox.enabled }}
+{{- $sb := .Values.sandbox }}
+---
+apiVersion: policies.kyverno.io/v1
+kind: MutatingPolicy
+metadata:
+  name: pd-sandbox-gvisor
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: "Pods run in the gVisor sandbox"
+    policies.kyverno.io/description: {{ printf "Sets runtimeClassName=%s on pods in namespaces labelled %s=%s. Skipped for host-network/PID/IPC, privileged and hostPath pods, pods that already name a runtime class, and pods annotated %s=disabled." $sb.runtimeClassName $sb.namespaceLabel $sb.namespaceLabelValue $sb.optOutAnnotation | quote }}
+spec:
+  failurePolicy: {{ $sb.failurePolicy }}
+  autogen:
+    podControllers:
+      controllers: []
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        {{ $sb.namespaceLabel }}: {{ $sb.namespaceLabelValue | quote }}
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+  matchConditions:
+    - name: runtime-class-unset
+      expression: '!has(object.spec.runtimeClassName)'
+    - name: not-opted-out
+      expression: >-
+        !(has(object.metadata.annotations) && {{ $sb.optOutAnnotation | quote }} in object.metadata.annotations &&
+          object.metadata.annotations[{{ $sb.optOutAnnotation | quote }}] == 'disabled')
+    - name: no-host-namespaces
+      expression: >-
+        !(has(object.spec.hostNetwork) && object.spec.hostNetwork) &&
+        !(has(object.spec.hostPID) && object.spec.hostPID) &&
+        !(has(object.spec.hostIPC) && object.spec.hostIPC)
+    - name: not-privileged
+      expression: >-
+        !(object.spec.containers + (has(object.spec.initContainers) ? object.spec.initContainers : [])).exists(c,
+          has(c.securityContext) && has(c.securityContext.privileged) && c.securityContext.privileged)
+    - name: no-hostpath
+      expression: >-
+        !has(object.spec.volumes) || !object.spec.volumes.exists(v, has(v.hostPath))
+  mutations:
+    - patchType: ApplyConfiguration
+      applyConfiguration:
+        expression: >-
+          Object{ spec: Object.spec{ runtimeClassName: {{ $sb.runtimeClassName | quote }} } }
+{{- end }}

@@ -1,0 +1,1 @@
+--8<-- "gitops/README.md"

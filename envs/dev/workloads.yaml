@@ -1,4 +1,8 @@
-# Workloads deployed to the dev environment (chart = directory at the repo root).
+# Workloads deployed to the dev environment (chart = directory at the repo root; the namespace must be declared in
+# values/cluster-bootstrap.yaml - CI checks that). One line adds a workload.
+# Optional per-entry field:  cluster: <name of a cluster registered in Argo CD>  (default in-cluster) - the hook for moving the shop to
+# its own cluster: register it, then put `cluster:` on every line (or move this file to envs/<new-env>/ and point the field there).
+# The whole layer can be switched off by replacing this list with `[]` (or by deleting gitops/apps/layer-workloads.yaml).
 - { app: product-catalog-db,       chart: product-catalog-db,       namespace: platform-demo }
 - { app: cart-redis,               chart: cart-redis,               namespace: platform-demo }
 - { app: product-catalog-service,  chart: product-catalog-service,  namespace: platform-demo }

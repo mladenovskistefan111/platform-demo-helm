@@ -1,0 +1,29 @@
+# Argo CD manages its own installation: chart from the Argo Helm repo, values from this repository.
+# Terraform installed the first copy (helm release `argocd`, namespace argocd, same chart version, bootstrap values only); from here on Git is
+# the source of truth. Wave 20 of the platform layer, i.e. LAST: only now does the Secret argocd-oidc (External Secrets, security layer) exist
+# and have Dex and the Gateway route been applied, which is what turning the local admin off needs. Keep the chart version equal to Terraform's (argocd_chart_version).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+  # No resources-finalizer: removing this Application (or its layer) must never uninstall Argo CD.
+spec:
+  project: platform-admin
+  sources:
+    - repoURL: https://argoproj.github.io/argo-helm
+      chart: argo-cd
+      targetRevision: 10.10.0
+      helm:
+        releaseName: argocd
+        valueFiles:
+          - $values/gitops/argocd/values.yaml
+    - repoURL: https://github.com/platform-boutique/platform-demo-helm.git
+      targetRevision: main
+      ref: values
+  destination: { name: in-cluster, namespace: argocd }
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [ServerSideApply=true]      # the namespace and its labels come from cluster-bootstrap

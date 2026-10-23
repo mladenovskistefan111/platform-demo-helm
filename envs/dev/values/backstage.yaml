@@ -1,0 +1,15 @@
+# dev = the AWS (EKS) environment. The catalog comes from the GitHub organisation (app-config.github.yaml, needs GITHUB_TOKEN, which
+# External Secrets Operator puts into backstage-secrets from SSM /platform-demo/github/token). The database is the RDS instance
+# platform-demo-backstage; its endpoint and credentials arrive through the same Secret.
+domain: platform-demo.click
+clusterName: platform-demo
+dex:
+  issuer: https://dex.platform-demo.click
+config:
+  files: [app-config.yaml, app-config.production.yaml, app-config.github.yaml]
+# Sandboxed runtime on AWS (RuntimeClass gvisor, created with the cluster add-ons). Kyverno also mutates it from a namespace label.
+runtimeClassName: gvisor
+images:
+  # Released image (platform-demo-backstage v0.1.1, signed). A promotion pull request changes tag and digest here, like for every service.
+  # The image carries the Amazon RDS CA bundle (NODE_EXTRA_CA_CERTS), see docs/secrets.md, "What the portal image needs".
+  backstage: { repository: mladenovskistefan/platform-demo-backstage, tag: 0.1.1, digest: sha256:34cef574900363ca8b14ea0018f43f7b1f2c0a8e7e2e48a59108918dbc0db97b }

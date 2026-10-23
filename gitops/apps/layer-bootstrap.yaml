@@ -1,0 +1,28 @@
+# Layer "bootstrap": namespaces and their labels, the gVisor RuntimeClass, and the one-off Job that restarts Cilium after SPIRE is up.
+# Sync wave 0 of platform-root: Argo CD syncs the layer, then waits until every Application in it is Healthy before it starts the
+# next wave. Deleting this file (or the layer's directory contents) removes the layer and, through the finalizer, everything in it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: layer-bootstrap
+  namespace: argocd
+  labels:
+    platform.demo/layer: bootstrap
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  # platform-admin on purpose: whoever may create Applications in the argocd namespace may name any project, so a "smaller" project
+  # here would only look safer. The projects that matter limit what the Applications INSIDE the layer may deploy.
+  project: platform-admin
+  source:
+    repoURL: https://github.com/platform-boutique/platform-demo-helm.git
+    targetRevision: main
+    path: gitops/layers/bootstrap
+  destination: { name: in-cluster, namespace: argocd }
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [ServerSideApply=true]
+    retry:
+      limit: 10
+      backoff: { duration: 15s, factor: 2, maxDuration: 5m }

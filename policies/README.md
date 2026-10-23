@@ -1,6 +1,6 @@
 # Kyverno policies
 
-Admission control for the cluster: what Cilium network policy and Pod Security cannot say. Kyverno **1.19.1** (chart 3.9.1) installed by Argo CD (`../gitops/apps/application-kyverno.yaml`, values in `../gitops/kyverno/values.yaml`); this chart (`policies/`) holds the policies, deployed by `../gitops/apps/application-policies.yaml` with `../envs/<env>/values/policies.yaml`.
+Admission control for the cluster: what Cilium network policy and Pod Security cannot say. Kyverno **1.19.1** (chart 3.9.1) installed by Argo CD (`../gitops/layers/security/application-kyverno.yaml`, values in `../gitops/kyverno/values.yaml`); this chart (`policies/`) holds the policies, deployed by `../gitops/layers/security/application-policies.yaml` with `../envs/<env>/values/policies.yaml`. On EKS the admission controller runs on the host network (port 9443): the pod network is an overlay the control plane cannot reach.
 
 All policies use the CEL policy types of `policies.kyverno.io/v1` (`ValidatingPolicy`, `MutatingPolicy`, `ImageValidatingPolicy`, `GeneratingPolicy`). The old `ClusterPolicy` API is deprecated upstream and not used.
 
@@ -18,7 +18,7 @@ All policies use the CEL policy types of `policies.kyverno.io/v1` (`ValidatingPo
 
 ## Catalog
 
-Scope **workload** = `platform-demo` (strict, enforced). Scope **platform** = `monitoring`, `argocd` (third-party stacks: only the generic checks, reported but never enforced unless `enforcePlatform: true`). Namespaces are named in `values.yaml` (`scopes`), not selected by label, so a namespace cannot opt out by being relabelled.
+Scope **workload** = `platform-demo` (strict, enforced). Scope **platform** = `argocd`, `backstage`, `sso` (third-party stacks, the developer portal and Dex: only the generic checks, reported but never enforced unless `enforcePlatform: true`; their images - Dex, PostgreSQL, the portal - are on the platform allow-list in `values.yaml`). Namespaces are named in `values.yaml` (`scopes`), not selected by label, so a namespace cannot opt out by being relabelled.
 
 | Policy | Kind | Scope | Rule |
 |---|---|---|---|
@@ -30,12 +30,13 @@ Scope **workload** = `platform-demo` (strict, enforced). Scope **platform** = `m
 | `pd-require-probes` (+`-platform`) | Validating | both | readiness + liveness probe; pods of Jobs are skipped |
 | `pd-service-account` | Validating | workload | not the `default` ServiceAccount; `automountServiceAccountToken: false` |
 | `pd-restrict-service-types` | Validating | cluster (except `gateway-system`) | `ClusterIP` only, no `externalIPs`. The Cilium Gateway Service is a NodePort in `gateway-system` |
-| `pd-restrict-route-hostnames` | Validating | cluster | HTTPRoutes must name hostnames, all under `domain` (`.platform-demo.test`) |
-| `pd-protect-network-policy` | Validating | workload, platform, `gateway-system` | create/update/delete of CiliumNetworkPolicy, CiliumClusterwideNetworkPolicy, NetworkPolicy, Gateway, HTTPRoute only by Argo CD, Kyverno's generator, the namespace/garbage-collector controllers or a cluster admin (`protectedChanges`). Reads `request.userInfo`, so admission only |
+| `pd-restrict-route-hostnames` | Validating | cluster | HTTPRoutes must name hostnames, all under `domain` (`.platform-demo.click`) |
+| `pd-protect-network-policy` | Validating | workload, platform, `gateway-system` | create/update/delete of CiliumNetworkPolicy, CiliumClusterwideNetworkPolicy, NetworkPolicy, Gateway, HTTPRoute only by Argo CD, Kyverno's generator, the namespace/garbage-collector controllers or a cluster admin (`protectedChanges`: users, groups, and `userPatterns` - regular expressions over the IAM identity EKS gives admins, because EKS access entries carry no Kubernetes group). Reads `request.userInfo`, so admission only |
 | `pd-no-exec-without-break-glass` | Validating | workload | `pods/exec`, `pods/attach`, `pods/ephemeralcontainers` refused unless the pod has `platform.demo/break-glass: "true"` |
 | `pd-namespace-pod-security` | Validating | cluster | workload namespaces (and any namespace labelled `platform.demo/profile: workload`) must enforce Pod Security `restricted`; platform namespaces at least `baseline` |
 | `pd-default-no-api-token` | Mutating | workload | sets `automountServiceAccountToken: false` when the pod says nothing |
 | `pd-default-seccomp-workload/-platform` | Mutating | both | sets `seccompProfile: RuntimeDefault` when unset |
+| `pd-sandbox-gvisor` | Mutating | namespaces labelled `platform.demo/sandbox=gvisor` | sets `runtimeClassName: gvisor` (see below); `failurePolicy: Fail` |
 | `pd-backstage-kubernetes-id` | Mutating | workload | copies `app.kubernetes.io/name` into `backstage.io/kubernetes-id` (the Backstage Kubernetes plugin's selector) |
 | `pd-namespace-baseline` | Generating | namespaces labelled `platform.demo/profile: workload` | ResourceQuota, LimitRange (defaults for containers that declare nothing) and a `default-deny` CiliumNetworkPolicy; kept in sync, regenerated within seconds if deleted |
 
@@ -57,13 +58,13 @@ Mutations only touch Pods (autogen off), so Deployments stay exactly as rendered
 3. Fix real findings in the charts; add a `PolicyException` only for knowing, documented deviations.
 4. Flip to `Deny`, run the live suite (below), merge.
 
-Failure policy is derived from the action: `Fail` when a policy can deny, `Ignore` while auditing, so auditing can never block admission. Webhooks skip `kube-system`, `kube-public`, `kube-node-lease`, `cilium-spire`, `cilium-secrets`, `local-path-storage` and `kyverno` (`../gitops/kyverno/values.yaml`): a Kyverno outage must never stop the CNI or SPIRE.
+Failure policy is derived from the action: `Fail` when a policy can deny, `Ignore` while auditing, so auditing can never block admission. Webhooks skip `kube-system`, `kube-public`, `kube-node-lease`, `cilium-spire`, `cilium-secrets` and `kyverno` (`../gitops/kyverno/values.yaml`): a Kyverno outage must never stop the CNI or SPIRE.
 
 ## Exceptions
 
 A `PolicyException` lives in the **`kyverno` namespace** (Kyverno ignores exceptions from anywhere else, `features.policyExceptions.namespace`), so nobody can exempt their own workload from inside its namespace. They are rendered from `values.yaml`:
 
-- `verifyImages.unsigned`: images that are knowingly unsigned. Today only `product-catalog-db` (a temporary hand-built local-testing image, replaced by RDS on AWS; the same entry is allow-listed by name in the Helm CI). Matched with **CEL on the pod** (label `app.kubernetes.io/name` *and* every container image starting with `mladenovskistefan/product-catalog-db@sha256:`).
+- `verifyImages.unsigned`: images that are knowingly unsigned. Today only `product-catalog-db` (a temporary hand-built image of the shop's in-cluster PostgreSQL, kept for now; the same entry is allow-listed by name in the Helm CI). Matched with **CEL on the pod** (label `app.kubernetes.io/name` *and* every container image starting with `mladenovskistefan/product-catalog-db@sha256:`).
 - `exceptions`: anything else. Today: the Argo CD application controller has no liveness probe (upstream removed it on purpose).
 
 Do not use `spec.images` in an exception: Kyverno before 1.19.1 ignored it (the exception then disabled verification for the *whole pod*), and matching on CEL is explicit anyway. Every exception needs a `reason`.
@@ -84,23 +85,30 @@ Annotating a pod needs `update` on pods, i.e. the same trust level as exec, but 
 
 | Layer | How | What it proves |
 |---|---|---|
-| Unit tests | `kyverno test policies/tests` (49 cases: identity, image source, hardening, guardrails, mutation). Render first: `helm template policies policies -f envs/dev/values/policies.yaml -s templates/<file>.yaml > policies/.rendered/<file>.yaml` | each rule passes good and rejects bad fixtures |
+| Unit tests | `kyverno test policies/tests` (57 cases: identity, image source, hardening, guardrails, mutation, sandbox). Render first: `helm template policies policies -f envs/dev/values/policies.yaml -s templates/<file>.yaml > policies/.rendered/<file>.yaml` | each rule passes good and rejects bad fixtures |
 | Rendered environments | `.github/scripts/policy-check.sh <dir with render-envs.py output>` (CI job *Kyverno policy tests*) | every workload/add-on that Argo CD would deploy satisfies the policies that can be evaluated offline; a chart change that admission would refuse fails the PR |
-| Live | `policies/tests/live/adversarial.sh` (29 cases, needs cluster-admin; dry-runs and impersonation, creates nothing) | the policies as deployed: identity theft, foreign/unpinned images, NodePort, foreign HTTPRoute, a non-admin editing CiliumNetworkPolicy, namespace Pod Security, exec/debug with and without break-glass; each denial is asserted to come from the intended policy |
+| Live | `policies/tests/live/adversarial.sh` (30 cases, needs cluster-admin; dry-runs and impersonation, creates nothing) | the policies as deployed: identity theft, foreign/unpinned images, NodePort, foreign HTTPRoute, a non-admin editing CiliumNetworkPolicy, namespace Pod Security, the gVisor mutation and its opt-out, exec/debug with and without break-glass; each denial is asserted to come from the intended policy |
 
 Offline tests cannot see the admission request, so `pd-protect-network-policy`, `pd-no-exec-without-break-glass` and signature checks are covered live only. In CI the offline evaluation skips policies with background scanning off.
 
+## gVisor sandbox
+
+`pd-sandbox-gvisor` (MutatingPolicy) adds `runtimeClassName: gvisor` to Pods created in namespaces labelled `platform.demo/sandbox=gvisor`. The label is set in **one** place: the namespace list in `../envs/<env>/values/cluster-bootstrap.yaml` (`sandbox: true|false`); the RuntimeClass (`handler: runsc`) comes from the same chart, the `runsc` runtime from the node image (Terraform).
+
+- **Opt a namespace out:** `sandbox: false` there (the label disappears; running pods keep their runtime until restarted).
+- **Opt a pod out:** pod annotation `platform.demo/sandbox: disabled` (charts: `podAnnotations`). Pods that already name a `runtimeClassName`, use `hostNetwork`/`hostPID`/`hostIPC`, are privileged or mount a `hostPath` are skipped automatically: they cannot run in a user-space kernel.
+- **Fail-closed:** `failurePolicy: Fail`, so an unavailable Kyverno refuses pods in those namespaces instead of starting them unsandboxed (Kyverno itself runs in an unlabelled namespace, so there is no deadlock). Policy objects take a few seconds to become active after they are applied; the GitOps order (security layer before platform and workloads) makes that window harmless.
+- The Kyverno CLI cannot evaluate a namespace selector on a custom label offline, so `tests/sandbox` runs the policy without it (policy-check.sh strips it); the selector is part of the live suite.
+
 ## Docker Hub and signature verification (read this)
 
-`pd-verify-images` reads the image manifest and its `sha256-<digest>.sig` from Docker Hub **at every pod admission**. Anonymous pulls are limited (100 per hour per IP) and a fresh `kind/up.sh` already uses most of them, so a lookup can fail with `TOOMANYREQUESTS`. For an enforcing policy a lookup *error* is a denial (`failurePolicy` does not change that), which would block rollouts. Therefore:
+`pd-verify-images` reads the image manifest and its `sha256-<digest>.sig` from Docker Hub **at every pod admission**. Anonymous pulls are limited (100 per hour per IP; on AWS all nodes share the NAT gateways' addresses), and for an enforcing policy a lookup *error* is a denial (`failurePolicy` does not change that). Therefore:
 
 - background re-verification is off (`evaluation.background.enabled: false`);
-- in **dev the policy only reports** (`actions: { verify-images: Audit }` in `envs/dev/values/policies.yaml`) until a read-only Docker Hub token exists;
-- to enforce: create a Docker Hub access token with read-only scope, run `DOCKERHUB_USERNAME=... DOCKERHUB_TOKEN=... kind/up.sh` (or create the Secret by hand: `kubectl -n kyverno create secret docker-registry dockerhub-read --docker-server=https://index.docker.io/v1/ --docker-username=... --docker-password=...`), set `verifyImages.pullSecret: dockerhub-read` in `envs/dev/values/policies.yaml` and delete the `verify-images: Audit` override. The Secret never goes into Git.
+- the policy reads Docker Hub with the read-only token in the Secret `kyverno/dockerhub-read` (`verifyImages.pullSecret`). External Secrets creates it from Parameter Store (`/platform-demo/dockerhub/username|token`, see the infra repository's `docs/secrets.md`); the GitOps order installs Kyverno only after that Secret exists. The Secret never goes into Git;
+- the policy is enforced in dev. If a lookup misbehaves on a first deploy, demote only this policy while debugging: `actions: { verify-images: Audit }` in `envs/dev/values/policies.yaml`.
 
-Verified before the quota ran out (2026-10-17): all 10 deployed service images verify; an image without a valid signature is denied (`image signature verification failed`); the `product-catalog-db` exception admits only that image under its own label.
-
-For AWS use ECR (pull-through cache) or a registry without anonymous limits; the policy only needs the image reference to point at it.
+Verified before (2026-10-17, on the former laptop cluster): all deployed service images verify; an image without a valid signature is denied (`image signature verification failed`); the `product-catalog-db` exception admits only that image under its own label. **Not yet verified on EKS.**
 
 ## Gotchas found building this
 

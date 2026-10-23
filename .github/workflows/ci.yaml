@@ -77,8 +77,10 @@ jobs:
           helm template platform-demo ./platform-demo -f platform-demo/values-prod.yaml \
             --set product-catalog-db.auth.existingSecret=s > rendered/umbrella-prod.yaml
           helm template platform-gateway ./platform-gateway > rendered/gateway.yaml
-          helm template monitoring-local ./monitoring-local > rendered/monitoring-local.yaml
-          # Every workload and add-on of every environment, rendered the way the ApplicationSets do.
+          # Not an environment add-on (its own Argo CD Application, project `secrets`): rendered here so kubeconform checks the ExternalSecrets.
+          helm template external-secrets-config ./external-secrets-config > rendered/external-secrets-config.yaml
+          # Every workload and add-on of every environment, rendered the way the ApplicationSets do (plus the layers'
+          # single-chart Applications: cluster-bootstrap, platform-network-policies). Fails when an app's namespace is undeclared.
           python3 .github/scripts/render-envs.py rendered
           wc -l rendered/*.yaml
 
@@ -117,7 +119,7 @@ jobs:
           ./kubeconform -strict -summary -kubernetes-version "$KUBERNETES_VERSION" \
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-            rendered/*.yaml gitops/apps/*.yaml gitops/bootstrap/*.yaml
+            rendered/*.yaml gitops/apps/*.yaml gitops/bootstrap/*.yaml gitops/layers/*/*.yaml
 
   # ─── misconfiguration scan ────────────────────────────────────────────────
 
@@ -128,30 +130,24 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: rendered
           path: rendered
 
-      # The charts that deploy to real clusters must be clean (HIGH/CRITICAL fail the build).
+      # The charts that deploy must be clean (HIGH/CRITICAL fail the build). Accepted findings, each with its reason:
+      # .trivyignore.yaml.
       - name: Trivy config - application and gateway charts
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: config
           scan-ref: rendered
-          skip-files: rendered/monitoring-local.yaml,rendered/env-dev-monitoring-local.yaml
+          trivyignores: .trivyignore.yaml
           severity: HIGH,CRITICAL
           exit-code: 1
-          format: table
-
-      # monitoring-local is a laptop-only chart running stock Grafana images; report, don't block.
-      - name: Trivy config - monitoring-local (report only)
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          scan-type: config
-          scan-ref: rendered/monitoring-local.yaml
-          severity: HIGH,CRITICAL
-          exit-code: 0
           format: table
 
   # ─── promotion gate ───────────────────────────────────────────────────────
@@ -178,8 +174,8 @@ jobs:
       # platform-demo-workflows release. Anything pushed by hand fails the promotion.
       - name: Verify digests and signatures
         env:
-          # product-catalog-db is a temporary, hand-built image for local testing; on AWS it is replaced
-          # by RDS and this entry goes away together with the chart. Do not add other images here.
+          # product-catalog-db is a temporary, hand-built image (kept as a StatefulSet for now); when it is replaced
+          # by RDS this entry goes away together with the chart. Do not add other images here.
           UNSIGNED_ALLOWLIST: product-catalog-db
         run: |
           images=$(grep -hE '^\s+image:' rendered/*.yaml | sed -E 's/^\s*image:\s*//; s/"//g' | sort -u | grep '^mladenovskistefan/' || true)
@@ -196,7 +192,7 @@ jobs:
                  "$ref" > /dev/null 2>&1; then
               echo "signed    $ref"
             elif [[ " $UNSIGNED_ALLOWLIST " == *" $name "* ]]; then
-              echo "::warning::$ref has no valid signature (allow-listed: $name is a temporary local-testing image)"
+              echo "::warning::$ref has no valid signature (allow-listed: $name is a temporary, hand-built image)"
             else
               echo "::error::$ref has no valid signature from our pipelines"; status=1
             fi

@@ -1,0 +1,61 @@
+# Dex (https://dexidp.io). Install into the `sso` namespace. Everybody - browsers and pods - reaches it as https://dex.<domain>: the ALB
+# terminates TLS (public certificate), the Gateway forwards plain HTTP to the Service, Dex speaks HTTP (port 5556).
+
+domain: platform-demo.click
+# Must be identical everywhere: it is the `iss` of every token and what the clients fetch /.well-known from.
+issuer: https://dex.platform-demo.click
+
+images:
+  # tag = which version, digest = what actually runs (Kyverno requires a digest). Bump both together.
+  dex: { repository: ghcr.io/dexidp/dex, tag: v2.46.0-distroless, digest: sha256:8ba378a122bf44478f29f9999fc92c658d047ea75f539a4c98af8b6db0da3589 }
+  pullPolicy: IfNotPresent
+
+# Secret with the client secrets and the connector credentials. Never in Git: External Secrets Operator creates it from AWS SSM
+# (external-secrets-config/, docs/secrets.md lists every key). Keys: GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET and the
+# `secretEnv` of every enabled client below.
+secretName: dex-secrets
+# Reloader annotation: a changed Secret restarts Dex (gitops/apps/application-reloader.yaml). Harmless without reloader.
+reloadOnSecretChange: true
+# Optional: Secret (type kubernetes.io/tls) with a certificate for dex.<domain>, served on 5557/443 to pods that resolve the issuer
+# to the Service (a private CA setup). Empty = plain HTTP behind the Gateway only, which is what a public certificate needs.
+tlsSecretName: ""
+
+# Storage of auth requests and tokens: `kubernetes` (custom resources in this namespace; Dex creates the CRDs itself, rbac.yaml
+# grants that) survives restarts. Not `memory`: Dex v2.46.0 deadlocked on the first refresh token with it when a local-password
+# connector was in use (dexidp/dex#4209, fix proposed in #4312, unreleased), and an in-memory store loses every session on a restart.
+# A SQL database with a pool larger than 1 would also work.
+storage:
+  type: kubernetes
+
+# People sign in with their GitHub account; only members of these organisations may. Their teams come through as
+# groups (`<org>:<team-slug>`). Needs an OAuth App (callback https://dex.<domain>/callback).
+github:
+  enabled: true
+  orgs:
+    - name: platform-boutique
+  # Secret keys GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET in `secretName`.
+
+# Applications that trust Dex (redirect URIs go through `tpl`, so {{ .Values.domain }} works). Each needs its secret in `secretName`
+# under the key named in secretEnv.
+clients:
+  - id: backstage
+    name: Backstage
+    secretEnv: BACKSTAGE_CLIENT_SECRET
+    redirectURIs:
+      - https://backstage.{{ .Values.domain }}/api/auth/oidc/handler/frame
+  - id: argocd
+    name: Argo CD
+    secretEnv: ARGOCD_CLIENT_SECRET
+    redirectURIs:
+      - https://argocd.{{ .Values.domain }}/auth/callback
+
+# How long a login lasts. Applications keep their own session after the code exchange; this bounds token refresh.
+expiry:
+  idTokens: 1h
+  refreshTokens:
+    validIfNotUsedFor: 24h
+    absoluteLifetime: 168h
+
+resources:
+  requests: { cpu: 20m, memory: 32Mi }
+  limits: { memory: 128Mi }

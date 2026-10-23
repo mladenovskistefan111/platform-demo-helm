@@ -90,8 +90,11 @@ jobs:
           wc -l rendered/*.yaml
 
       # The app dropdowns of the Promote and Rollback workflows list the workloads that have an image; a new service must be added there.
-      - name: Check the dispatch dropdowns against the workloads
-        run: python3 .github/scripts/check-dispatch-apps.py
+      # The promotion chain (dev -> promote-stage -> promote-prod, nothing on envs/prod) is checked statically.
+      - name: Check the dispatch dropdowns and the promotion chain
+        run: |
+          python3 .github/scripts/check-dispatch-apps.py
+          python3 .github/scripts/check-promotion-chain.py
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -275,6 +278,9 @@ jobs:
 
       - name: Self-test of the policy
         run: .github/scripts/test-promotion-policy.sh
+
+      - name: Self-test of the promotion planning (promote.sh)
+        run: .github/scripts/test-promote.sh
 
       - name: Check the pull request
         env:

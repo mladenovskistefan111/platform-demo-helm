@@ -16,7 +16,7 @@
 # Needs the history of the base branch (checkout with fetch-depth: 0).
 # Environment: BASE_REF (default origin/main), HEAD_REF (default HEAD), HEAD_BRANCH (name of the PR branch, optional),
 #              LABELS (comma separated PR labels, optional).
-# Also sourceable: the img_* helpers read a values file on stdin (used by the Promote workflow).
+# Also sourceable: the img_* helpers read a values file on stdin (used by promote.sh, which the promotion workflows run).
 
 # Block-style top-level `image:` key, direct children only. Prints the value of $1 (tag|digest) without quotes.
 img_get() {

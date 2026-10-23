@@ -36,7 +36,7 @@ image:
 ```
 
 One file per app per environment, `<app>` = the chart directory at the repository root. Promotion is a pull request that changes `tag` and
-`digest` (and the comment) of that file; dev, stage and prod are promoted independently. With a digest set the pod runs `repository@digest`;
+`digest` (and the comment) of that file; each environment takes its digest from the one before it (dev -> stage -> prod, see [promote.md](promote.md)). With a digest set the pod runs `repository@digest`;
 the tag only shows up as the `app.kubernetes.io/version` label. `render-envs.py` fails when a service's `tag` is missing or its digest is
 not `sha256:<64 hex>`, and CI verifies the cosign signature of every digest.
 

@@ -78,7 +78,19 @@ The services export telemetry to `alloy.monitoring.svc.cluster.local` (or `--set
 
 ## Promote an image
 
-From the browser, no typing of digests: **Actions -> Promote -> Run workflow**, pick the **app** (dropdown), the **env** (`stage` takes what dev runs, `prod` takes what stage runs) and, for stage, the **version** `X.Y.Z`. A pull request is opened, checked and auto-merged; `prod` first waits for the reviewer of the GitHub environment `prod`. **Actions -> Rollback** does the same in reverse (app, env, `previous` / `latest` / a digest / a git SHA). dev is filled automatically when an app repository merges to `main`. Details, the required check (`gate`) and the signer policy: [docs/promote.md](docs/promote.md).
+Nothing is typed and nothing is rebuilt. The chain is automatic up to two clicks:
+
+```
+merge in an app repository -> publish (build once, scan, sign) -> pull request promote/<app>/dev, auto-merged  = DEV deployed
+   -> "Promote to stage" starts by itself and waits:   Actions -> the waiting run -> Review deployments -> `stage` -> Approve   (click 1)
+   -> pull request promote/<app>/stage, auto-merged     = STAGE deployed (the version <app>-vX.Y.Z is computed: the next patch)
+   -> "Promote to prod" starts by itself and waits:     Actions -> the waiting run -> Review deployments -> `prod`  -> Approve   (click 2)
+   -> pull request promote/<app>/prod, auto-merged      = PROD deployed (nothing starts after this)
+```
+
+A newer change replaces a run that is still waiting; a rollback never starts a promotion. **Actions -> Promote** is the manual form (app
+dropdown or `all`, env, and an optional `version` for a minor/major bump); it waits at the same approvals. **Actions -> Rollback** goes the other
+way (app, env, `previous` / `latest` / a digest / a git SHA). Details, the required check (`gate`) and the signer policy: [docs/promote.md](docs/promote.md).
 
 ## What each chart provides
 
@@ -132,7 +144,7 @@ helm dependency update <chart>                               # after changing pl
 
 Charts and the library share a version contract: bump `platform-common` and re-run `helm dependency update` in every chart that should pick it up (Argo CD runs `helm dependency build` itself; `Chart.lock` files are committed, the vendored `charts/*.tgz` are not).
 
-The pull-request pipeline (`.github/workflows/ci.yaml`, nothing runs on push): helm lint of every chart, render of the umbrella and of every shop and platform app, kubeconform (strict, Kubernetes + CRD schemas incl. Cilium/Gateway API/Argo CD), Trivy config scan (rendered charts must be clean), a cosign gate (every deployed `mladenovskistefan/*` image pinned by digest and signed by an allowed workflow, `verifyImages.signers`), **Kyverno policy tests** (unit tests for every policy, then every rendered workload/add-on of every environment is evaluated against the policies, so a chart change that admission would refuse fails the PR), the promotion policy, secret scan and workflow lint. All jobs run in parallel on every pull request and a final **`gate`** job, the only required status check, fails when any of them failed, was cancelled or was skipped without a reason ([docs/promote.md](docs/promote.md)).
+The pull-request pipeline (`.github/workflows/ci.yaml`; the only workflows that run on push are the promotion chain and the stage release): helm lint of every chart, render of the umbrella and of every shop and platform app, kubeconform (strict, Kubernetes + CRD schemas incl. Cilium/Gateway API/Argo CD), Trivy config scan (rendered charts must be clean), a cosign gate (every deployed `mladenovskistefan/*` image pinned by digest and signed by an allowed workflow, `verifyImages.signers`), **Kyverno policy tests** (unit tests for every policy, then every rendered workload/add-on of every environment is evaluated against the policies, so a chart change that admission would refuse fails the PR), the promotion policy, secret scan and workflow lint. All jobs run in parallel on every pull request and a final **`gate`** job, the only required status check, fails when any of them failed, was cancelled or was skipped without a reason ([docs/promote.md](docs/promote.md)).
 
 ## Status
 

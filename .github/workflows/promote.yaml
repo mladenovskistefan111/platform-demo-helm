@@ -1,9 +1,8 @@
 name: Promote
 
-# The manual form of the promotion chain. Normally you do not need it: "Promote to stage" starts by itself when dev changes and
-# "Promote to prod" starts by itself when stage changes (promote-stage.yaml, promote-prod.yaml), each waiting for one click.
-# Use this form to promote an app that has no waiting run (a run was rejected or replaced), to promote everything at once, or to choose
-# the version yourself. Started by a person: Actions -> Promote -> Run workflow (branch: main).
+# The manual form of the promotion. Normally you do not need it: the application repository's Publish run carries an image from dev to
+# stage to prod, waiting for one click per environment. Use this form to promote an app whose run was rejected or replaced, to promote
+# several apps at once, or to choose the version yourself. Started by a person: Actions -> Promote -> Run workflow (branch: main).
 #
 #   app      one of the shop services (a dropdown) or `all` (every app whose digest differs). The list is checked against the
 #            workloads by .github/scripts/check-dispatch-apps.py in CI: add a service there when you add a workload.

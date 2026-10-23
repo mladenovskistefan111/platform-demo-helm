@@ -1,0 +1,77 @@
+name: Stage release
+
+# After a promotion to stage is merged, the version that was typed in Promote becomes a tag and a GitHub Release of THIS repository:
+# <app>-vX.Y.Z on the merge commit. The release notes hold the image digest, so the version stays answerable after stage has moved on.
+# Idempotent: it looks at the last commits that touched envs/stage/values and creates only the releases that are missing, so it can
+# also be started by hand (Actions -> Stage release) when a push did not trigger it. An existing tag is never moved.
+# Nothing is tagged in the application repositories.
+
+on:
+  push:
+    branches: [main]
+    paths: ['envs/stage/values/*.yaml']
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: stage-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Create missing releases
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # tags and releases
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Tag and release new versions
+        run: |
+          set -euo pipefail
+          # shellcheck source=/dev/null
+          source .github/scripts/promotion-policy.sh
+          created=0
+          # newest first; the last 30 commits that touched a stage values file are plenty
+          while read -r sha; do
+            [ -n "$sha" ] || continue
+            parent=$(git rev-parse --verify --quiet "$sha^" || true)
+            while read -r f; do
+              [ -n "$f" ] || continue
+              app=$(basename "$f" .yaml)
+              content=$(git show "$sha:$f" 2> /dev/null) || continue
+              version=$(img_version <<< "$content")
+              [ -n "$version" ] || continue
+              old=""
+              if [ -n "$parent" ] && old_content=$(git show "$parent:$f" 2> /dev/null); then old=$(img_version <<< "$old_content"); fi
+              [ "$version" != "$old" ] || continue
+              tag="$app-v$version"
+              digest=$(img_digest <<< "$content")
+              if git rev-parse --quiet --verify "refs/tags/$tag" > /dev/null; then
+                echo "$tag exists already."
+                continue
+              fi
+              image_tag=$(img_tag <<< "$content")
+              gh release create "$tag" --target "$sha" --latest=false --title "$app $version" --notes "$(
+                echo "Stage release \`$version\` of \`$app\`."
+                echo
+                echo "- image: \`mladenovskistefan/$app@$digest\`${image_tag:+ (tag \`$image_tag\`)}"
+                echo "- helm commit: $GITHUB_SERVER_URL/$GH_REPO/commit/$sha"
+                echo
+                echo "Made by stage-release.yaml after the promotion to stage was merged. The application repositories are not tagged."
+              )"
+              echo "::notice::Created release $tag at ${sha:0:7}."
+              created=$((created + 1))
+            done < <(git diff --name-only --no-renames "${parent:-$(git hash-object -t tree /dev/null)}" "$sha" -- 'envs/stage/values/*.yaml')
+          done < <(git log -n 30 --format=%H -- 'envs/stage/values/*.yaml')
+          echo "Created $created release(s)."

@@ -1,0 +1,56 @@
+name: Rollback
+
+# Moves one app in one environment back, or forward again, to a digest that was deployed before, through a pull request that passes
+# the same checks as any change (no bypass). Started by a person: Actions -> Rollback -> Run workflow.
+#
+#   to = previous   the digest the file had before its latest change (run again: forward again)
+#   to = latest     forward to the newest change: stage and prod take what the previous environment has now; dev takes the newest
+#                   promotion on main (rollback commits are skipped)
+#   to = sha256:... a digest that this app had before in any environment
+#   to = <git sha>  a commit of this repository on main: the image of the app as it was then
+# Prod waits for the reviewer of the GitHub environment `prod`.
+# Details and the rules live in the shared gitops-rollback workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: Chart name (checkout-service, frontend, ...)
+        type: string
+        required: true
+      env:
+        description: Environment
+        type: choice
+        options: [dev, stage, prod]
+        required: true
+      to:
+        description: previous, latest, a sha256:... digest, or a git SHA of this repository
+        type: string
+        required: false
+        default: previous
+
+permissions: {}
+
+jobs:
+  approve:
+    name: Approve (prod)
+    if: inputs.env == 'prod'
+    runs-on: ubuntu-latest
+    environment: prod
+    permissions: {}
+    steps:
+      - run: echo "Approved by a reviewer of the prod environment."
+
+  rollback:
+    needs: approve
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && (inputs.env != 'prod' || needs.approve.result == 'success') }}
+    permissions: {}
+    # Not pinned to a real commit yet: set it to the commit of the merged platform-demo-workflows release that adds gitops-rollback.yaml.
+    uses: platform-boutique/platform-demo-workflows/.github/workflows/gitops-rollback.yaml@0000000000000000000000000000000000000000 # TODO v3.1.0
+    with:
+      app: ${{ inputs.app }}
+      env: ${{ inputs.env }}
+      to: ${{ inputs.to }}
+    secrets:
+      PROMOTE_APP_ID: ${{ secrets.PROMOTE_APP_ID }}
+      PROMOTE_APP_PRIVATE_KEY: ${{ secrets.PROMOTE_APP_PRIVATE_KEY }}

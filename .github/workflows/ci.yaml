@@ -241,6 +241,37 @@ jobs:
           python3 .github/scripts/render-envs.py rendered
           .github/scripts/policy-check.sh rendered
 
+  # ─── promotion policy ─────────────────────────────────────────────────────
+
+  # Which image changes a pull request may make (dev: any signed digest; stage: what dev has now or what stage had before;
+  # prod: the same with stage; one environment per pull request, nothing else mixed in). Rules: .github/scripts/promotion-policy.sh.
+  promotion-policy:
+    name: Promotion policy
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read # to read the labels at run time (re-run the job after adding a label)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the policy reads the history of the base branch
+          persist-credentials: false
+
+      - name: Self-test of the policy
+        run: .github/scripts/test-promotion-policy.sh
+
+      - name: Check the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_REF: origin/${{ github.base_ref }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          LABELS=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" --jq '[.[].name] | join(",")')
+          export LABELS
+          .github/scripts/promotion-policy.sh
+
   # ─── repo hygiene ─────────────────────────────────────────────────────────
 
   secret-scan:

@@ -4,6 +4,10 @@ metadata:
   name: dex
   namespace: {{ .Release.Namespace }}
   labels: {{- include "dex.labels" . | nindent 4 }}
+  {{- if .Values.reloadOnSecretChange }}
+  annotations:
+    secret.reloader.stakater.com/reload: {{ .Values.secretName | quote }}
+  {{- end }}
 spec:
   replicas: 1
   strategy: { type: Recreate }
@@ -38,7 +42,9 @@ spec:
             - secretRef: { name: {{ .Values.secretName }} }
           ports:
             - { name: http, containerPort: 5556 }
+            {{- if .Values.tlsSecretName }}
             - { name: https, containerPort: 5557 }
+            {{- end }}
             - { name: telemetry, containerPort: 5558 }
           readinessProbe:
             httpGet: { path: /healthz/ready, port: telemetry }
@@ -56,13 +62,17 @@ spec:
             capabilities: { drop: [ALL] }
           volumeMounts:
             - { name: config, mountPath: /etc/dex/config.yaml, subPath: config.yaml, readOnly: true }
+            {{- if .Values.tlsSecretName }}
             - { name: tls, mountPath: /etc/dex/tls, readOnly: true }
+            {{- end }}
             - { name: tmp, mountPath: /tmp }
       volumes:
         - name: config
           configMap: { name: dex }
+        {{- if .Values.tlsSecretName }}
         - name: tls
           secret: { secretName: {{ .Values.tlsSecretName }} }
+        {{- end }}
         - { name: tmp, emptyDir: { sizeLimit: 16Mi } }
 ---
 apiVersion: v1
@@ -77,6 +87,8 @@ spec:
     app.kubernetes.io/instance: {{ .Release.Name }}
   ports:
     # 80: what the Gateway forwards browsers to (TLS already terminated).
-    # 443: what pods reach as https://dex.<domain> through the CoreDNS rewrite; Dex terminates TLS itself.
+    # 443 (only with tlsSecretName): Dex terminates TLS itself for pods that resolve the issuer to this Service.
     - { name: http, port: 80, targetPort: http }
+    {{- if .Values.tlsSecretName }}
     - { name: https, port: 443, targetPort: https }
+    {{- end }}

@@ -18,9 +18,11 @@ data:
       {{- end }}
     web:
       http: 0.0.0.0:5556
+      {{- if .Values.tlsSecretName }}
       https: 0.0.0.0:5557
       tlsCert: /etc/dex/tls/tls.crt
       tlsKey: /etc/dex/tls/tls.key
+      {{- end }}
     telemetry:
       http: 0.0.0.0:5558
     expiry:
@@ -48,9 +50,11 @@ data:
     {{- end }}
     staticClients:
       {{- range .Values.clients }}
+      {{- if ne (toString .enabled) "false" }}
       - id: {{ .id }}
         name: {{ .name | quote }}
         secretEnv: {{ .secretEnv }}
         redirectURIs:
           {{- toYaml .redirectURIs | nindent 10 }}
+      {{- end }}
       {{- end }}

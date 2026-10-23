@@ -21,16 +21,36 @@ spec:
     {{- include "esc.ssm" (dict "root" . "key" "POSTGRES_HOST" "path" (printf "%s/host" $r.ssmPath)) | nindent 4 }}
     {{- include "esc.ssm" (dict "root" . "key" "POSTGRES_PORT" "path" (printf "%s/port" $r.ssmPath)) | nindent 4 }}
     {{- include "esc.ssm" (dict "root" . "key" "POSTGRES_USER" "path" (printf "%s/username" $r.ssmPath)) | nindent 4 }}
-    # RDS-managed master password (Secrets Manager, JSON {username,password}); rotated every 7 days
-    - secretKey: POSTGRES_PASSWORD
-      sourceRef:
-        storeRef: { kind: ClusterSecretStore, name: aws-secrets-manager }
-      remoteRef:
-        key: {{ $r.masterSecretId | quote }}
-        property: password
     {{- include "esc.ssm" (dict "root" . "key" "BACKSTAGE_OIDC_CLIENT_SECRET" "path" "sso/backstage-client-secret") | nindent 4 }}
     {{- include "esc.ssm" (dict "root" . "key" "AUTH_SESSION_SECRET" "path" "backstage/auth-session-secret") | nindent 4 }}
     {{- include "esc.ssm" (dict "root" . "key" "GITHUB_TOKEN" "path" "github/token") | nindent 4 }}
     {{- if .Values.grafana.enabled }}
     {{- include "esc.ssm" (dict "root" . "key" "GRAFANA_TOKEN" "path" "grafana/backstage-token") | nindent 4 }}
     {{- end }}
+---
+# The RDS-managed master password, merged into the same Secret. RDS names the Secrets Manager secret `rds!db-<random id>` and the id changes
+# every time the database is built, so it cannot be written down in Git: it is FOUND by name (the platform has one RDS instance).
+# The secret is JSON {username,password}; the template keeps only the password. Rotated by RDS every 7 days; Reloader restarts Backstage.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ .Values.backstage.secretName }}-database
+  namespace: {{ .Values.backstage.namespace }}
+  labels: {{- include "esc.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  refreshInterval: {{ .Values.refreshInterval }}
+  secretStoreRef: { kind: ClusterSecretStore, name: aws-secrets-manager }
+  target:
+    name: {{ .Values.backstage.secretName }}
+    # The first ExternalSecret owns the Secret; this one adds a key to it.
+    creationPolicy: Merge
+    template:
+      engineVersion: v2
+      mergePolicy: Merge
+      data:
+        POSTGRES_PASSWORD: '{{ "{{ range $k, $v := . }}{{ ($v | fromJson).password }}{{ end }}" }}'
+  dataFrom:
+    - find:
+        name: { regexp: {{ $r.masterSecretNameRegexp | quote }} }

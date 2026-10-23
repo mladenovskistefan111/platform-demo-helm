@@ -45,7 +45,7 @@ written by `infra/terraform` and must not be edited by hand.
 | `/platform-demo/rds/backstage/port` | `backstage-secrets` `POSTGRES_PORT` | Backstage | Terraform | (String) `5432` |
 | `/platform-demo/rds/backstage/username` | `backstage-secrets` `POSTGRES_USER` | Backstage | Terraform | (String) `backstage` |
 | `/platform-demo/rds/backstage/database` | not read by a chart (Backstage creates one database per plugin) | documentation | Terraform | (String) `backstage` |
-| Secrets Manager: the RDS-managed secret of `platform-demo-backstage` (JSON `username`, `password`) | `backstage-secrets` `POSTGRES_PASSWORD` (property `password`) | Backstage | RDS (managed, rotated every 7 days) | none; its ARN goes into `envs/dev/values/external-secrets-config.yaml` (`rds.masterSecretId`) |
+| Secrets Manager: the RDS-managed secret of `platform-demo-backstage` (JSON `username`, `password`) | `backstage-secrets` `POSTGRES_PASSWORD` (property `password`) | Backstage | RDS (managed, rotated every 7 days) | none; found by name (`rds!db-*`) by the ExternalSecret, so the random id never reaches Git (needs `secretsmanager:ListSecrets` for the operator role) |
 | `/platform-demo/sso/grafana-client-secret`, `/platform-demo/grafana/backstage-token` | only when `grafana.enabled` | Dex client `grafana`, Backstage Grafana card | typed, **only if Grafana is deployed** | `openssl rand -base64 32`; a Grafana service-account token |
 
 Creating a typed parameter (the value never touches a file or the shell history; paste it when asked):

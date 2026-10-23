@@ -19,10 +19,9 @@ allowedNamespaces: [backstage, sso, argocd, kyverno]
 ssmPrefix: /platform-demo
 
 rds:
-  # Secrets Manager secret that RDS manages for the master user (JSON {username,password}): name (rds!db-<uuid>) or ARN.
-  # `aws rds describe-db-instances --db-instance-identifier platform-demo-backstage --query 'DBInstances[0].MasterUserSecret.SecretArn'`
-  # or the Terraform output. Set it per environment in envs/<env>/values/external-secrets-config.yaml.
-  masterSecretId: "rds!db-REPLACE-WITH-THE-SECRET-OF-platform-demo-backstage"
+  # The Secrets Manager secret that RDS manages for the master user ({username,password}) is found by this name pattern: its name
+  # (rds!db-<random id>) changes with every new database. Needs secretsmanager:ListSecrets (infra: modules/secrets-access).
+  masterSecretNameRegexp: "^rds!db-"
   # SSM String parameters written by Terraform: <ssmPrefix>/rds/backstage/{host,port,username}.
   ssmPath: rds/backstage
 

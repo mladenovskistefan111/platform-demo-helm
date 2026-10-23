@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Pod
+metadata: { name: bare, namespace: sandboxed, labels: { app.kubernetes.io/name: frontend } }
+spec: { containers: [{ name: c, image: i }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: other-runtime, namespace: sandboxed }
+spec: { runtimeClassName: kata, containers: [{ name: c, image: i }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: host-network, namespace: sandboxed }
+spec: { hostNetwork: true, containers: [{ name: c, image: i }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: host-pid, namespace: sandboxed }
+spec: { hostPID: true, containers: [{ name: c, image: i }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: privileged-init, namespace: sandboxed }
+spec:
+  initContainers: [{ name: i, image: i, securityContext: { privileged: true } }]
+  containers: [{ name: c, image: i }]
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: host-path, namespace: sandboxed }
+spec:
+  containers: [{ name: c, image: i }]
+  volumes: [{ name: h, hostPath: { path: /var/log } }]
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: opted-out, namespace: sandboxed, annotations: { platform.demo/sandbox: disabled } }
+spec: { containers: [{ name: c, image: i }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: annotation-other-value, namespace: sandboxed, annotations: { platform.demo/sandbox: "no" } }
+spec: { containers: [{ name: c, image: i }] }

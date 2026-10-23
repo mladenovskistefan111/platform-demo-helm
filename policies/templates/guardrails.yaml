@@ -54,10 +54,13 @@
     - { key: kubernetes.io/metadata.name, operator: In, values: %s }` (toJson (concat $policed (list "gateway-system"))))
   "variables" (printf `- name: users
   expression: '%s'
+- name: patterns
+  expression: '%s'
 - name: groups
-  expression: '%s'` (toJson .Values.protectedChanges.users) (toJson .Values.protectedChanges.groups))
+  expression: '%s'` (toJson .Values.protectedChanges.users) (toJson (.Values.protectedChanges.userPatterns | default (list))) (toJson .Values.protectedChanges.groups))
   "validations" `- expression: >-
     request.userInfo.username in variables.users ||
+    variables.patterns.exists(p, request.userInfo.username.matches(p)) ||
     request.userInfo.groups.exists(g, g in variables.groups)
   messageExpression: >-
     request.userInfo.username + ' may not ' + request.operation.lowerAscii() + ' ' + request.resource.resource +

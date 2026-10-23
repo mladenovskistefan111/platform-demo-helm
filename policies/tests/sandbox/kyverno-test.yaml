@@ -1,0 +1,12 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata: { name: sandbox }
+# The policy is rendered WITHOUT its namespaceSelector (policy-check.sh strips it): the Kyverno CLI cannot evaluate a selector on a
+# custom namespace label offline. The label selection is covered by the live suite (tests/live/adversarial.sh); what is tested here is
+# which pods are mutated and which are skipped once the namespace is selected.
+policies: [../../.rendered/mutation-sandbox.yaml]
+resources: [resources.yaml]
+results:
+  - { policy: pd-sandbox-gvisor, isMutatingPolicy: true, kind: Pod, resources: [bare, annotation-other-value], patchedResources: patched.yaml, result: pass }
+  # a pod that already names a runtime class, uses host namespaces, is privileged, mounts a hostPath or opts out is left alone
+  - { policy: pd-sandbox-gvisor, isMutatingPolicy: true, kind: Pod, resources: [other-runtime, host-network, host-pid, privileged-init, host-path, opted-out], result: skip }

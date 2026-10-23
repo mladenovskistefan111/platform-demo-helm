@@ -30,7 +30,7 @@ Scope **workload** = `platform-demo` (strict, enforced). Scope **platform** = `m
 | `pd-require-probes` (+`-platform`) | Validating | both | readiness + liveness probe; pods of Jobs are skipped |
 | `pd-service-account` | Validating | workload | not the `default` ServiceAccount; `automountServiceAccountToken: false` |
 | `pd-restrict-service-types` | Validating | cluster (except `gateway-system`) | `ClusterIP` only, no `externalIPs`. The Cilium Gateway Service is a NodePort in `gateway-system` |
-| `pd-restrict-route-hostnames` | Validating | cluster | HTTPRoutes must name hostnames, all under `domain` (`.platform-demo.test`) |
+| `pd-restrict-route-hostnames` | Validating | cluster | HTTPRoutes must name hostnames, all under `domain` (`.platform-demo.click`) |
 | `pd-protect-network-policy` | Validating | workload, platform, `gateway-system` | create/update/delete of CiliumNetworkPolicy, CiliumClusterwideNetworkPolicy, NetworkPolicy, Gateway, HTTPRoute only by Argo CD, Kyverno's generator, the namespace/garbage-collector controllers or a cluster admin (`protectedChanges`). Reads `request.userInfo`, so admission only |
 | `pd-no-exec-without-break-glass` | Validating | workload | `pods/exec`, `pods/attach`, `pods/ephemeralcontainers` refused unless the pod has `platform.demo/break-glass: "true"` |
 | `pd-namespace-pod-security` | Validating | cluster | workload namespaces (and any namespace labelled `platform.demo/profile: workload`) must enforce Pod Security `restricted`; platform namespaces at least `baseline` |

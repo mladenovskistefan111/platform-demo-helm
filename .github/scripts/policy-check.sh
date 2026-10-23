@@ -14,6 +14,17 @@ for t in identity images hardening guardrails mutation; do
   helm template policies policies -f "$env_values" -s "templates/$t.yaml" > "$out/$t.yaml"
 done
 
+# The Kyverno CLI cannot evaluate a namespaceSelector on a custom label (platform.demo/sandbox) offline: test the sandbox mutation
+# without it (tests/sandbox); the selector itself is covered by tests/live/adversarial.sh.
+python3 - "$out" <<'PY'
+import sys, yaml
+out = sys.argv[1]
+docs = [d for d in yaml.safe_load_all(open(f"{out}/mutation.yaml")) if d and d["metadata"]["name"] == "pd-sandbox-gvisor"]
+for d in docs:
+    d["spec"]["matchConstraints"].pop("namespaceSelector", None)
+yaml.safe_dump_all(docs, open(f"{out}/mutation-sandbox.yaml", "w"), sort_keys=False)
+PY
+
 echo "::group::kyverno test"
 kyverno test policies/tests
 echo "::endgroup::"

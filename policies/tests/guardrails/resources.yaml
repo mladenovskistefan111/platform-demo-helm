@@ -34,7 +34,7 @@ spec: { type: NodePort, ports: [{ port: 80 }] }
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata: { name: ours, namespace: platform-demo }
-spec: { hostnames: [shop.platform-demo.test], rules: [{ backendRefs: [{ name: frontend, port: 80 }] }] }
+spec: { hostnames: [shop.platform-demo.click], rules: [{ backendRefs: [{ name: frontend, port: 80 }] }] }
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -44,7 +44,7 @@ spec: { hostnames: [bank.example.com], rules: [{ backendRefs: [{ name: frontend,
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata: { name: suffix-trick, namespace: platform-demo }
-spec: { hostnames: [evilplatform-demo.test], rules: [{ backendRefs: [{ name: frontend, port: 80 }] }] }
+spec: { hostnames: [evilplatform-demo.click], rules: [{ backendRefs: [{ name: frontend, port: 80 }] }] }
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

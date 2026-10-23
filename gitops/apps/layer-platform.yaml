@@ -1,4 +1,4 @@
-# Layer "platform": network policy for the platform namespaces, then Gateway + Dex + Backstage (envs/<env>/addons.yaml), then Argo CD managing itself.
+# Layer "platform": network policy for the platform namespaces, then Gateway + Dex + Backstage (clusters/main/addons.yaml), then Argo CD managing itself.
 # Sync wave 20 of platform-root: Argo CD syncs the layer, then waits until every Application in it is Healthy before it starts the
 # next wave. Deleting this file (or the layer's directory contents) removes the layer and, through the finalizer, everything in it.
 apiVersion: argoproj.io/v1alpha1

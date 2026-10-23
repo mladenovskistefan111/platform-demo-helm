@@ -1,4 +1,4 @@
-# dev = the AWS cluster. The workload profile (platform-demo) is ENFORCED; the platform profile (argocd, backstage, sso) only reports.
+# Cluster main (AWS). The workload profile (the shop namespaces of all environments) is ENFORCED; the platform profile (argocd, backstage, sso) only reports.
 # Per-policy overrides go under `actions`, e.g. { pod-identity: Audit } to demote one while investigating.
 defaultAction: Deny
 enforcePlatform: false

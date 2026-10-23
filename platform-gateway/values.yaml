@@ -1,4 +1,4 @@
-# Hostnames are built from `domain`:  shop, grafana, argocd, hubble, backstage, dex . <domain>
+# Hostnames are built from `domain`:  shop, dev.shop, stage.shop, grafana, argocd, hubble, backstage, dex . <domain>
 domain: platform-demo.click
 
 # Cilium registers this GatewayClass when gatewayAPI.enabled=true.
@@ -27,7 +27,11 @@ forwardedProto: https
 
 # One HTTPRoute per entry, in the namespace of the Service it points to. `enabled: false` drops the route (its Route 53 record can stay).
 routes:
-  shop:      { namespace: platform-demo, service: frontend,      port: 80,   host: shop }
+  # The shop, one route per environment, each in the environment's namespace (they must match envs/<env>/workloads.yaml). Prod has the
+  # bare host; dev and stage are subdomains of it. The route name is the key, so give every environment its own.
+  shop:        { namespace: platform-demo,       service: frontend, port: 80, host: shop }
+  shop-dev:    { namespace: dev-platform-demo,   service: frontend, port: 80, host: dev.shop }
+  shop-stage:  { namespace: stage-platform-demo, service: frontend, port: 80, host: stage.shop }
   grafana:   { namespace: monitoring,    service: grafana,       port: 3000, host: grafana, enabled: false }   # no Grafana on this cluster
   argocd:    { namespace: argocd,        service: argocd-server, port: 80,   host: argocd }
   hubble:    { namespace: kube-system,   service: hubble-ui,     port: 80,   host: hubble }

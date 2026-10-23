@@ -1,2 +1,3 @@
 image:
+  tag: "1.0.0"
   digest: sha256:dc106726ade580e7a2ba16d9d39270d89f7afca59809d2667ff1add384a1ce64   # v1.0.0

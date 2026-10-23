@@ -1,5 +1,5 @@
-# Everything that must exist before the rest of the platform is synced. Per-environment content (the namespace list) lives in
-# ../envs/<env>/values/cluster-bootstrap.yaml, the same pattern as policies/.
+# Everything that must exist before the rest of the platform is synced. Per-cluster content (the namespace list) lives in
+# ../clusters/<cluster>/values/cluster-bootstrap.yaml, the same pattern as policies/.
 
 # Namespaces of the cluster. One entry per namespace; this is the ONLY place that decides a namespace's labels.
 #   name         namespace name

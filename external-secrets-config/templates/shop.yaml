@@ -1,25 +1,31 @@
 {{- if .Values.shop.enabled }}
-# platform-demo/product-catalog-db-credentials: the shop database's name, user and password. The database (a StatefulSet in the cluster, for
-# now) and product-catalog-service read this one Secret. Name and user are plain values; only the password comes from Parameter Store.
+{{- range .Values.shop.environments }}
+---
+# <namespace>/product-catalog-db-credentials: the shop database's name, user and password of ONE environment. The database (a StatefulSet
+# in the cluster, for now) and product-catalog-service of that environment read this Secret. Name and user are plain values; only the
+# password comes from Parameter Store, from the environment's own parameter ({{ $.Values.ssmPrefix }}/{{ .passwordPath }}).
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
-  name: {{ .Values.shop.secretName }}
-  namespace: {{ .Values.shop.namespace }}
-  labels: {{- include "esc.labels" . | nindent 4 }}
+  name: {{ $.Values.shop.secretName }}
+  namespace: {{ .namespace }}
+  labels:
+    {{- include "esc.labels" $ | nindent 4 }}
+    platform.demo/env: {{ .name }}
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  refreshInterval: {{ .Values.refreshInterval }}
+  refreshInterval: {{ $.Values.refreshInterval }}
   secretStoreRef: { kind: ClusterSecretStore, name: aws-parameter-store }
   target:
-    name: {{ .Values.shop.secretName }}
+    name: {{ $.Values.shop.secretName }}
     creationPolicy: Owner
     template:
       data:
-        POSTGRES_DB: {{ .Values.shop.database | quote }}
-        POSTGRES_USER: {{ .Values.shop.user | quote }}
+        POSTGRES_DB: {{ $.Values.shop.database | quote }}
+        POSTGRES_USER: {{ $.Values.shop.user | quote }}
         POSTGRES_PASSWORD: {{ `{{ .password }}` | quote }}
   data:
-    {{- include "esc.ssm" (dict "root" . "key" "password" "path" .Values.shop.passwordPath) | nindent 4 }}
+    {{- include "esc.ssm" (dict "root" $ "key" "password" "path" .passwordPath) | nindent 4 }}
+{{- end }}
 {{- end }}

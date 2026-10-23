@@ -1,14 +1,14 @@
-# The cluster policies (chart `policies/`, values per environment). Wave 30: after Kyverno is Healthy. Argo CD still retries if a CRD is
+# The cluster policies (chart `policies/`, values clusters/main/values/policies.yaml). Wave 30: after Kyverno is Healthy. Argo CD still retries if a CRD is
 # late; SkipDryRunOnMissingResource lets the first sync pass before Kyverno has registered its kinds.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: dev-policies
+  name: policies
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "30"
   labels:
-    platform.demo/env: dev
+    platform.demo/cluster: main
     platform.demo/kind: policies
   finalizers: [resources-finalizer.argocd.argoproj.io]
 spec:
@@ -20,7 +20,7 @@ spec:
     helm:
       releaseName: policies
       valueFiles:
-        - ../envs/dev/values/policies.yaml
+        - ../clusters/main/values/policies.yaml
   destination: { name: in-cluster, namespace: kyverno }
   syncPolicy:
     automated: { prune: true, selfHeal: true }

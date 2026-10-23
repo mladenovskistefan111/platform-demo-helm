@@ -13,7 +13,7 @@ operator:
   namespace: external-secrets
 
 # Only these namespaces may use the ClusterSecretStores (otherwise any namespace could read /platform-demo/* from SSM).
-allowedNamespaces: [backstage, sso, argocd, kyverno, platform-demo]
+allowedNamespaces: [backstage, sso, argocd, kyverno, platform-demo, dev-platform-demo, stage-platform-demo]
 
 # Prefix of every parameter (Terraform and the people who type the secrets use the same one).
 ssmPrefix: /platform-demo
@@ -45,14 +45,19 @@ kyverno:
   dockerhubReadEnabled: true
   dockerhubSecretName: dockerhub-read
 
-# The shop's database credentials (product-catalog-db StatefulSet and product-catalog-service). Only the password is secret.
+# The shop's database credentials (product-catalog-db StatefulSet and product-catalog-service), one Secret per shop environment: the same
+# Secret name in every environment namespace, but each environment reads its OWN Parameter Store entry, so a leaked or rotated dev password
+# says nothing about prod. Only the password is secret. passwordPath is relative to ssmPrefix. The list must name every namespace of
+# envs/<env>/workloads.yaml (CI checks it); a new environment adds one entry here and creates its SecureString by hand (docs/secrets.md).
 shop:
   enabled: true
-  namespace: platform-demo
   secretName: product-catalog-db-credentials
   database: product_catalog
   user: catalog_user
-  passwordPath: product-catalog-db/postgres-password
+  environments:
+    - { name: prod,  namespace: platform-demo,       passwordPath: product-catalog-db/postgres-password }
+    - { name: stage, namespace: stage-platform-demo, passwordPath: stage/product-catalog-db/postgres-password }
+    - { name: dev,   namespace: dev-platform-demo,   passwordPath: dev/product-catalog-db/postgres-password }
 
 # Grafana is not deployed on AWS (yet): its OIDC client secret and the Backstage Grafana token are only read when this is true.
 grafana:

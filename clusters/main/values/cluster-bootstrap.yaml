@@ -1,8 +1,10 @@
-# Namespaces of the dev cluster and their labels (see cluster-bootstrap/values.yaml for the meaning of each field).
+# Namespaces of the cluster `main` and their labels (see cluster-bootstrap/values.yaml for the meaning of each field).
 # This is the ONE place that decides Pod Security, the Kyverno workload profile and the gVisor sandbox per namespace.
 #
 # gVisor (sandbox: true) is on where the pods are ordinary application pods, off where it cannot or should not be:
-#   platform-demo   YES  the shop; includes the PostgreSQL StatefulSet (EBS volume) and Redis - see gitops/README.md "gVisor" for the risks
+#   platform-demo, dev-platform-demo, stage-platform-demo
+#                   YES  the shop, one namespace per environment (prod keeps the original name); includes the PostgreSQL StatefulSet (EBS volume)
+#                        and Redis - see gitops/README.md "gVisor" for the risks. All three carry exactly the same labels.
 #   backstage, sso  YES  Node.js portal and Dex: plain TCP clients/servers, no host access
 #   argocd          NO   the repo-server forks helm/git/kustomize (syscall-heavy, slow in a user-space kernel) and Argo CD is the way to recover everything else
 #   kyverno         NO   admission webhooks run on the host network (EKS control plane cannot reach pod IPs over the overlay); host-network pods cannot be sandboxed
@@ -21,5 +23,8 @@ namespaces:
   - { name: gateway-system, podSecurity: baseline, sandbox: false }
   - { name: sso, podSecurity: baseline, sandbox: true }
   - { name: backstage, podSecurity: baseline, sandbox: true }
-  # workloads layer (the shop)
-  - { name: platform-demo, podSecurity: restricted, profile: workload, sandbox: true }
+  # workloads layer (the shop, one namespace per environment: envs/<env>/workloads.yaml). Every namespace named there must be listed here,
+  # and in policies (scopes.workload), external-secrets-config (allowedNamespaces, shop.environments) and the AppProjects: CI checks all of it.
+  - { name: platform-demo, podSecurity: restricted, profile: workload, sandbox: true }          # prod
+  - { name: stage-platform-demo, podSecurity: restricted, profile: workload, sandbox: true }
+  - { name: dev-platform-demo, podSecurity: restricted, profile: workload, sandbox: true }

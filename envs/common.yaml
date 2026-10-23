@@ -1,0 +1,22 @@
+# Defaults for EVERY shop application in EVERY environment (dev, stage, prod). Argo CD and render-envs.py pass this file first, then
+# envs/<env>/values/<app>.yaml, so a per-env file only needs to hold what differs. A change here reaches all three environments at once.
+global:
+  networkPolicy:
+    type: cilium        # CiliumNetworkPolicy with SPIFFE/SPIRE mutual authentication (see platform-common)
+# Mutual authentication is ON (the chart default, stated here on purpose): every rule between two services requires a SPIFFE identity.
+# It needs SPIRE, which Terraform installs with Cilium; gitops/layers/bootstrap restarts Cilium once SPIRE is up, before this layer syncs.
+# The rules select pods of the policy's OWN namespace (see platform-common), so dev, stage and prod cannot talk to each other.
+networkPolicy:
+  cilium:
+    authentication: required
+
+# Small profile (same as platform-demo/values-dev.yaml): one replica, no HPA/PDB/spread (two Spot nodes, one namespace quota).
+# This is what production runs today as well, so all three environments share it. With one replica nothing needs an HPA or a PDB
+# (a PDB with minAvailable 1 on one replica would block node drains). When production gets real redundancy, set replicaCount,
+# autoscaling, podDisruptionBudget and topologySpread in envs/prod/values/<app>.yaml (or add envs/prod/common.yaml to the
+# ApplicationSet's valueFiles), never here: dev and stage must stay at one replica.
+replicaCount: 1
+autoscaling: { enabled: false }
+podDisruptionBudget: { enabled: false }
+topologySpread: { enabled: false }
+preStopSleepSeconds: 0

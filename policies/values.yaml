@@ -1,5 +1,5 @@
-# Kyverno policies for platform-demo (policies.kyverno.io/v1 CEL policy types). Environment overrides live in
-# ../envs/<env>/values/policies.yaml. Everything defaults to AUDIT: violations are reported (PolicyReports + kubectl
+# Kyverno policies for platform-demo (policies.kyverno.io/v1 CEL policy types). Cluster overrides live in
+# ../clusters/<cluster>/values/policies.yaml. Everything defaults to AUDIT: violations are reported (PolicyReports + kubectl
 # warnings) but nothing is blocked. Flip a policy to Deny in `actions` once its report is clean.
 
 # Audit | Deny for every policy unless `actions` says otherwise.
@@ -11,7 +11,9 @@ enforcePlatform: false
 
 # Namespaces by profile. Policies name them explicitly (not by label) so a namespace cannot opt out by being relabelled.
 scopes:
-  workload: [platform-demo]       # our services: the strict profile
+  # our services: the strict profile. One namespace per shop environment (envs/<env>/workloads.yaml); CI fails when an environment's
+  # namespace is missing here, because an unlisted namespace would silently get NO policy.
+  workload: [platform-demo, dev-platform-demo, stage-platform-demo]
   platform: [argocd, backstage, sso]  # third-party stacks and the portal: registry/resources/probes checks, never the identity rules
 
 # Hostnames HTTPRoutes may claim.

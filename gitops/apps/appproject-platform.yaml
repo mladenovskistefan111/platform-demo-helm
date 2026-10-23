@@ -16,7 +16,9 @@ spec:
     # HTTPRoutes and network policy live next to the services they belong to
     - { name: in-cluster, namespace: argocd }
     - { name: in-cluster, namespace: kube-system }       # route to Hubble UI
-    - { name: in-cluster, namespace: platform-demo }     # route to the shop's frontend
+    - { name: in-cluster, namespace: platform-demo }     # routes to the shop's frontend, one per environment namespace
+    - { name: in-cluster, namespace: stage-platform-demo }
+    - { name: in-cluster, namespace: dev-platform-demo }
   clusterResourceWhitelist:
     - { group: rbac.authorization.k8s.io, kind: ClusterRole }
     - { group: rbac.authorization.k8s.io, kind: ClusterRoleBinding }

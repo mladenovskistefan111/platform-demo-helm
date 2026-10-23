@@ -8,12 +8,12 @@ platform-root  (Terraform; path gitops/apps)
  |-- layer-bootstrap  (wave 0)   gitops/layers/bootstrap
  |     `-- cluster-bootstrap          namespaces + labels, RuntimeClass gvisor, one-off Job: restart Cilium after SPIRE
  |-- layer-security   (wave 10)  gitops/layers/security
- |     |-- external-secrets  (0) -> external-secrets-config (10) + reloader (10) -> kyverno (20) -> dev-policies (30)
+ |     |-- external-secrets  (0) -> external-secrets-config (10) + reloader (10) -> kyverno (20) -> policies (30)
  |-- layer-platform   (wave 20)  gitops/layers/platform
  |     |-- platform-network-policies (0) -> platform-addons ApplicationSet (10) -> argocd (20)
- |     |                                     `-- dev-platform-gateway, dev-dex, dev-backstage   (envs/dev/addons.yaml)
+ |     |                                     `-- platform-gateway, dex, backstage   (clusters/main/addons.yaml)
  `-- layer-workloads  (wave 20)  gitops/layers/workloads
-       `-- platform-workloads ApplicationSet -> dev-<service> x 12   (envs/dev/workloads.yaml)
+       `-- platform-workloads ApplicationSet -> <env>-<app> x 12 for each of dev, stage, prod   (envs/<env>/workloads.yaml)
 ```
 
 ## Layers, waves, why this order
@@ -22,27 +22,28 @@ Sync waves order the Applications *inside* one parent: Argo CD syncs a wave, wai
 
 | Layer / wave | Application | Project | What it is | Why here |
 |---|---|---|---|---|
-| bootstrap / 0 | `cluster-bootstrap` | `bootstrap` | Chart `cluster-bootstrap/` with `envs/dev/values/cluster-bootstrap.yaml`: every Namespace with its Pod Security, Kyverno-profile and gVisor labels (wave -10), RuntimeClass `gvisor` (-5), and the Job `spire-cilium-restart` (5) | Namespaces must exist, labelled, before secrets, policies or apps; the RuntimeClass before the first sandboxed pod; Cilium must restart once SPIRE runs, before any pod needs mutual authentication |
+| bootstrap / 0 | `cluster-bootstrap` | `bootstrap` | Chart `cluster-bootstrap/` with `clusters/main/values/cluster-bootstrap.yaml`: every Namespace with its Pod Security, Kyverno-profile and gVisor labels (wave -10), RuntimeClass `gvisor` (-5), and the Job `spire-cilium-restart` (5) | Namespaces must exist, labelled, before secrets, policies or apps; the RuntimeClass before the first sandboxed pod; Cilium must restart once SPIRE runs, before any pod needs mutual authentication |
 | security / 0 | `external-secrets` | `secrets` | External Secrets Operator (chart 2.11.0) | CRDs and webhook first |
-| security / 10 | `external-secrets-config`, `reloader` | `secrets` | ClusterSecretStore + ExternalSecrets (`sso/dex-secrets`, `backstage/backstage-secrets`, `argocd/argocd-oidc`, `kyverno/dockerhub-read`, the shop's DB credentials), Reloader | An ExternalSecret is Healthy only once its Secret exists, so the next wave cannot start without them |
+| security / 10 | `external-secrets-config`, `reloader` | `secrets` | ClusterSecretStore + ExternalSecrets (`sso/dex-secrets`, `backstage/backstage-secrets`, `argocd/argocd-oidc`, `kyverno/dockerhub-read`, the shop's DB credentials, one per environment namespace), Reloader | An ExternalSecret is Healthy only once its Secret exists, so the next wave cannot start without them |
 | security / 20 | `kyverno` | `security` | Kyverno 1.19 (chart 3.9.1), 2 admission replicas on the host network | After `kyverno/dockerhub-read` exists ("Kyverno waits for it") |
-| security / 30 | `dev-policies` | `security` | Chart `policies/` (enforcing: workload scope; reporting: platform scope), incl. the gVisor mutation | Needs the Kyverno CRDs |
+| security / 30 | `policies` | `security` | Chart `policies/` (enforcing: workload scope; reporting: platform scope), incl. the gVisor mutation | Needs the Kyverno CRDs |
 | platform / 0 | `platform-network-policies` | `platform` | Default-deny + allow rules for argocd, sso, backstage, gateway-system | Rules exist before the pods |
-| platform / 10 | ApplicationSet `platform-addons` | `platform` | `dev-platform-gateway`, `dev-dex`, `dev-backstage` | Admission control and secrets are in place |
+| platform / 10 | ApplicationSet `platform-addons` | `platform` | `platform-gateway`, `dex`, `backstage` (from `clusters/main/addons.yaml`) | Admission control and secrets are in place |
 | platform / 20 | `argocd` | `platform-admin` | Argo CD managing itself from `argocd/values.yaml` (admin off, Dex SSO) | Last on purpose: `admin.enabled=false` is applied only after the `argocd-oidc` Secret exists and Dex was deployed |
-| workloads / 20 | ApplicationSet `platform-workloads` | `workloads` | The shop: 10 services, `product-catalog-db` and `cart-redis` StatefulSets | Needs security (policies, mutation, secrets) but not Dex/Backstage, hence the same wave as platform: a missing GitHub OAuth parameter must not keep the shop from deploying |
+| workloads / 20 | ApplicationSet `platform-workloads` | `workloads` | The shop, three environments (`dev-`, `stage-`, `prod-<app>`): per environment 10 services, `product-catalog-db` and `cart-redis` StatefulSets, each in its own namespace | Needs security (policies, mutation, secrets) but not Dex/Backstage, hence the same wave as platform: a missing GitHub OAuth parameter must not keep the shop from deploying |
 
 Generated Applications (ApplicationSets) cannot be ordered against each other - the controller creates them, a sync does not - so the shop's services and the add-ons rely on retries until their dependencies are up (as before).
 
-**Projects (least privilege).** `platform-admin` (Argo CD itself and the layer definitions, cluster-admin, unchanged and mirrored by Terraform), `bootstrap` (Namespace, RuntimeClass, one Job and two Roles), `secrets` (the two operators, CRDs and webhooks), `security` (Kyverno and the policies), `platform` (namespaced add-on resources and the two ClusterRoles Dex/Backstage need; **no Namespace rights**), `workloads` (namespaced resources in `platform-demo` only, no quota or LimitRange changes). The layer Applications themselves are in `platform-admin`: anyone who may create Applications in the `argocd` namespace can name any project, so only the leaf projects carry the restrictions.
+**Projects (least privilege).** `platform-admin` (Argo CD itself and the layer definitions, cluster-admin, unchanged and mirrored by Terraform), `bootstrap` (Namespace, RuntimeClass, one Job and two Roles), `secrets` (the two operators, CRDs and webhooks), `security` (Kyverno and the policies), `platform` (namespaced add-on resources and the two ClusterRoles Dex/Backstage need; **no Namespace rights**), `workloads` (namespaced resources in the three shop namespaces only, no quota or LimitRange changes). The layer Applications themselves are in `platform-admin`: anyone who may create Applications in the `argocd` namespace can name any project, so only the leaf projects carry the restrictions.
 
 ## How to ...
 
-- **Add a workload or add-on:** one line in `envs/<env>/workloads.yaml` or `addons.yaml` (`{ app, chart, namespace }`), values in `envs/<env>/values/<app>.yaml`. *The namespace must be declared in `envs/<env>/values/cluster-bootstrap.yaml`* (with its labels): the ApplicationSets no longer create namespaces, so an undeclared one fails the sync, and CI (`inject-namespaces.py`) fails the pull request first.
+- **Add a shop app or a platform add-on:** one line in `envs/<env>/workloads.yaml` (every environment that should run it) or `clusters/main/addons.yaml` (`{ app, chart, namespace }`), values in `envs/<env>/values/<app>.yaml` or `clusters/main/values/<app>.yaml`. *The namespace must be declared in `clusters/main/values/cluster-bootstrap.yaml`* (with its labels): the ApplicationSets do not create namespaces, so an undeclared one fails the sync, and CI (`render-envs.py`, `inject-namespaces.py`) fails the pull request first. A new shop app also needs its name in `policies/values.yaml` (`identity.workloads`); step by step in [docs/environments.md](../docs/environments.md).
 - **Add a cluster-level piece:** a file in `gitops/layers/<layer>/` with a `argocd.argoproj.io/sync-wave` annotation; pick the layer by what it needs.
-- **Switch a layer off:** workloads: replace the list in `envs/dev/workloads.yaml` with `[]`, or delete `apps/layer-workloads.yaml`. Namespaces are never pruned (`Prune=false,Delete=false`), so PVCs survive.
-- **A second environment / cluster:** `envs/<new>/` with its own lists and values; to target another cluster, register it in Argo CD and put `cluster: <name>` on the entries (the ApplicationSets read it, default `in-cluster`), then add the destination to the `workloads` project. Application names are `<env>-<app>`.
-- **Promote an image:** change `image.digest` in `envs/<env>/values/<app>.yaml` via PR.
+- **Switch a layer off:** one shop environment: replace the list in `envs/<env>/workloads.yaml` with `[]`; the whole shop: delete `apps/layer-workloads.yaml`. Namespaces are never pruned (`Prune=false,Delete=false`), so PVCs survive.
+- **A new shop environment:** `envs/<new>/workloads.yaml` + `values/`, plus its namespace in the lists that CI cross-checks; the checklist is in [docs/environments.md](../docs/environments.md). Application names are `<env>-<app>`, so they never clash.
+- **Another cluster:** to target one, register it in Argo CD and put `cluster: <name>` on the entries (both ApplicationSets read it, default `in-cluster`), then add the destinations to the projects. The platform of a second cluster gets its own `clusters/<name>/` directory (the add-ons ApplicationSet already reads `clusters/*/addons.yaml`; give its Applications a name prefix then, see the comment in `applicationset-addons.yaml`).
+- **Promote an image:** change `image.tag` and `image.digest` in `envs/<env>/values/<app>.yaml` via PR (one file per app per environment).
 - **Opt a namespace out of gVisor:** `sandbox: false` in `cluster-bootstrap.yaml`; one pod: annotation `platform.demo/sandbox: disabled` (`podAnnotations` in the chart's values).
 
 ## First boot: from "terraform apply finished" to "everything synced"
@@ -58,23 +59,23 @@ If something is stuck: `kubectl -n argocd get applications -o wide`, then `argoc
 
 ## What Terraform must provide (contract)
 
-Namespaces `argocd`, `external-secrets` (ServiceAccount `external-secrets` with the IRSA annotation); Cilium with `authentication.mutual.spire` (server as root, gp3 PVC), WireGuard, Gateway API on the host network, Hubble; default StorageClass `gp3`; nodes with the `runsc` containerd handler; an ALB that terminates TLS and forwards HTTP to port **8080** on every node (`gateway_port`); Route 53 records for argocd, backstage, dex, hubble, shop; Argo CD helm release `argocd` (chart 10.10.0, `server.insecure=true`); `root.yaml` mirrored. **The ALB must also admit the NAT gateways' public addresses on 443**: Argo CD and Backstage fetch `https://dex.platform-demo.click` from inside the cluster, which goes out through the NAT gateway and back in through the ALB.
+Namespaces `argocd`, `external-secrets` (ServiceAccount `external-secrets` with the IRSA annotation); Cilium with `authentication.mutual.spire` (server as root, gp3 PVC), WireGuard, Gateway API on the host network, Hubble; default StorageClass `gp3`; nodes with the `runsc` containerd handler; an ALB that terminates TLS and forwards HTTP to port **8080** on every node (`gateway_port`); Route 53 records for argocd, backstage, dex, hubble, shop, dev.shop, stage.shop (and a certificate that covers `*.shop.platform-demo.click`: the wildcard `*.platform-demo.click` stops at one label); Argo CD helm release `argocd` (chart 10.10.0, `server.insecure=true`); `root.yaml` mirrored. **The ALB must also admit the NAT gateways' public addresses on 443**: Argo CD and Backstage fetch `https://dex.platform-demo.click` from inside the cluster, which goes out through the NAT gateway and back in through the ALB.
 
 ## Namespaces, Pod Security and gVisor
 
-All namespaces are declared in [`envs/dev/values/cluster-bootstrap.yaml`](../envs/dev/values/cluster-bootstrap.yaml). Pods in namespaces labelled `platform.demo/sandbox=gvisor` get `runtimeClassName: gvisor` from the Kyverno mutation `pd-sandbox-gvisor` (see [policies/README.md](../policies/README.md)). Sandboxed: `platform-demo`, `backstage`, `sso`. Not sandboxed, with reasons: `argocd` (the repo-server forks helm/git constantly and Argo CD is the recovery path), `kyverno` and `external-secrets` (webhooks must run on the host network, which cannot be sandboxed), `gateway-system` (no pods), `reloader`, `kube-system`/`cilium-spire` (not ours: host network, privileged, hostPath).
+All namespaces are declared in [`clusters/main/values/cluster-bootstrap.yaml`](../clusters/main/values/cluster-bootstrap.yaml). Pods in namespaces labelled `platform.demo/sandbox=gvisor` get `runtimeClassName: gvisor` from the Kyverno mutation `pd-sandbox-gvisor` (see [policies/README.md](../policies/README.md)). Sandboxed: the three shop namespaces (`platform-demo` = prod, `stage-platform-demo`, `dev-platform-demo`), `backstage`, `sso`. Not sandboxed, with reasons: `argocd` (the repo-server forks helm/git constantly and Argo CD is the recovery path), `kyverno` and `external-secrets` (webhooks must run on the host network, which cannot be sandboxed), `gateway-system` (no pods), `reloader`, `kube-system`/`cilium-spire` (not ours: host network, privileged, hostPath).
 
 Risks that only a live cluster can confirm (the user's call: debug later):
 
 - Cilium's per-packet datapath works for gVisor pods (their traffic leaves through the veth), but Cilium's *socket-level* load balancing cannot see inside the sandbox. If Service names do not work from sandboxed pods, set `socketLB.hostNamespaceOnly=true` in the Terraform Cilium values.
-- `product-catalog-db` (PostgreSQL on an EBS PVC) and `cart-redis` run sandboxed: file I/O and `fsync` through the sandbox's gofer are slower, `fsGroup` ownership is applied by the kubelet on the host before start (fine), the root filesystem is read-only plus `emptyDir` (the chart's `tmpVolume`). First fallback: annotation `platform.demo/sandbox: disabled` in `envs/dev/values/product-catalog-db.yaml` (`podAnnotations`).
+- `product-catalog-db` (PostgreSQL on an EBS PVC) and `cart-redis` run sandboxed: file I/O and `fsync` through the sandbox's gofer are slower, `fsGroup` ownership is applied by the kubelet on the host before start (fine), the root filesystem is read-only plus `emptyDir` (the chart's `tmpVolume`). First fallback: annotation `platform.demo/sandbox: disabled` in `envs/<env>/values/product-catalog-db.yaml` (`podAnnotations`).
 - The shop's gRPC services keep long-lived HTTP/2 connections; gVisor's network stack is slower than the host's. Throughput is not a goal here; failures such as resets under load would show in Hubble.
 - JVM/.NET/Node runtimes read cgroup limits through gVisor's emulated `/sys/fs/cgroup`; a service that sizes its heap wrongly shows up as OOM kills.
 - Spot interruption of the node that hosts the only Kyverno replica: two replicas on two different nodes (host port 9443) mitigate this; with one node left, the second replica stays Pending and the PDB blocks a drain.
 
 ## Mutual authentication (SPIRE) and network policy
 
-Shop services use CiliumNetworkPolicy with `authentication.mode: required` between services (`networkPolicy.cilium.authentication: required`, stated in `envs/dev/values/common.yaml`); Kyverno generates a default-deny per workload namespace. The Gateway (host network, entity `ingress`) is never asked to authenticate. Platform namespaces get plain identity-based policy from `platform-network-policies` (no mutual authentication: Dex and Backstage are reached by browsers through the Gateway).
+Shop services use CiliumNetworkPolicy with `authentication.mode: required` between services (`networkPolicy.cilium.authentication: required`, stated in `envs/common.yaml`); Kyverno generates a default-deny per workload namespace, i.e. for each of the three shop namespaces. The allow rules a chart brings select pods of the policy's own namespace only, so dev, stage and prod cannot reach each other (and a pod in one environment is a different Cilium/SPIFFE identity from the same service in another, because the namespace is part of the identity). The Gateway (host network, entity `ingress`) is never asked to authenticate. Platform namespaces get plain identity-based policy from `platform-network-policies` (no mutual authentication: Dex and Backstage are reached by browsers through the Gateway).
 
 The Job `spire-cilium-restart` is a **plain Job, not a hook**: it runs once when `cluster-bootstrap` is first synced and never again (a finished Job stays Healthy and unchanged; a hook would run after every sync). If it is deleted, self-heal recreates it and Cilium restarts once more, which is a harmless rolling restart; change `spireRestart.rerun` to run it on purpose; set `spireRestart.enabled: false` if SPIRE is ever turned off in Terraform (otherwise the layer would wait forever). Its ServiceAccount can only watch `statefulset/spire-server` and `daemonset/spire-agent` in `cilium-spire` and get/patch `daemonset/cilium` and `deployment/cilium-operator` in `kube-system`.
 
@@ -96,12 +97,12 @@ hubble observe -n platform-demo --type policy-verdict | grep -i auth    # "AUTH 
 hubble observe -n argocd --verdict DROPPED               # Argo CD must not be dropped (egress to API server, GitHub, Dex)
 hubble observe -n sso --verdict DROPPED; hubble observe -n backstage --verdict DROPPED
 policies/tests/live/adversarial.sh                       # live admission suite
-curl -sI https://argocd.platform-demo.click | head -3    # 200 from the ALB through the Gateway; the same for backstage, dex (/.well-known/openid-configuration), shop, hubble
+curl -sI https://argocd.platform-demo.click | head -3    # 200 from the ALB through the Gateway; the same for backstage, dex (/.well-known/openid-configuration), shop, dev.shop, stage.shop, hubble
 ```
 
 ## Gateway on EKS
 
-`platform-gateway` declares one Gateway with an HTTP listener on 8080 (the port the ALB forwards to; Cilium binds it on every node) and HTTPRoutes for shop, argocd, hubble, backstage and dex under `platform-demo.click` (Grafana is a disabled entry: no monitoring stack on this cluster). TLS and the HTTP-to-HTTPS redirect are the ALB's. Cilium's Envoy rewrites `X-Forwarded-Proto` to the scheme of its own connection, so each route sets `X-Forwarded-Proto: https` explicitly. Argo CD runs with `server.insecure` (plain HTTP behind the ALB). Hubble UI has no login of its own: the ALB's address allow-list is its only protection.
+`platform-gateway` declares one Gateway with an HTTP listener on 8080 (the port the ALB forwards to; Cilium binds it on every node) and HTTPRoutes for the shop (`shop`, `dev.shop`, `stage.shop`, each in its environment's namespace), argocd, hubble, backstage and dex under `platform-demo.click` (Grafana is a disabled entry: no monitoring stack on this cluster). TLS and the HTTP-to-HTTPS redirect are the ALB's. Cilium's Envoy rewrites `X-Forwarded-Proto` to the scheme of its own connection, so each route sets `X-Forwarded-Proto: https` explicitly. Argo CD runs with `server.insecure` (plain HTTP behind the ALB). Hubble UI has no login of its own: the ALB's address allow-list is its only protection.
 
 ## Operating
 

@@ -1,4 +1,5 @@
 image:
+  tag: "1.0.0"
   digest: sha256:fc355592e4a67d4c10898297f1b5d38422b2859fa5373341fdb2bce857d66715   # v1.0.0
 networkPolicy:
   ingress:

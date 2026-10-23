@@ -1,0 +1,128 @@
+{{- if .Values.spireRestart.enabled }}
+{{- $ns := .Values.spireRestart.namespace }}
+{{- $labels := dict "app.kubernetes.io/name" "spire-cilium-restart" "app.kubernetes.io/part-of" "platform-demo" }}
+{{- /* Least privilege: this ServiceAccount can watch the two SPIRE workloads and restart exactly daemonset/cilium and deployment/cilium-operator. */}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: spire-cilium-restart
+  namespace: {{ $ns }}
+  labels: {{- toYaml $labels | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: spire-cilium-restart
+  namespace: cilium-spire
+  labels: {{- toYaml $labels | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+rules:
+  - apiGroups: [apps]
+    resources: [statefulsets]
+    resourceNames: [spire-server]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [daemonsets]
+    resourceNames: [spire-agent]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: spire-cilium-restart
+  namespace: cilium-spire
+  labels: {{- toYaml $labels | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: spire-cilium-restart }
+subjects:
+  - { kind: ServiceAccount, name: spire-cilium-restart, namespace: {{ $ns }} }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: spire-cilium-restart
+  namespace: kube-system
+  labels: {{- toYaml $labels | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+rules:
+  # `kubectl rollout restart` is a patch of the pod template; `rollout status` watches the object.
+  - apiGroups: [apps]
+    resources: [daemonsets]
+    resourceNames: [cilium]
+    verbs: [get, list, watch, patch]
+  - apiGroups: [apps]
+    resources: [deployments]
+    resourceNames: [cilium-operator]
+    verbs: [get, list, watch, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: spire-cilium-restart
+  namespace: kube-system
+  labels: {{- toYaml $labels | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: spire-cilium-restart }
+subjects:
+  - { kind: ServiceAccount, name: spire-cilium-restart, namespace: {{ $ns }} }
+{{/*
+A plain Job, deliberately NOT an Argo CD hook: a hook would run after every sync of this chart. A normal resource is created once;
+afterwards Argo CD finds it unchanged and leaves it alone (a finished Job stays Healthy). If it is deleted, self-heal recreates it and
+Cilium is restarted once more, which is harmless (a rolling restart). Change `spireRestart.rerun` to run it again on purpose.
+Steps are init containers so that the image needs no shell: wait for the SPIRE server, wait for the agents, restart, wait for Cilium.
+*/}}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: spire-cilium-restart
+  namespace: {{ $ns }}
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+    platform.demo/rerun: {{ .Values.spireRestart.rerun | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  backoffLimit: 6
+  activeDeadlineSeconds: 3600
+  template:
+    metadata:
+      labels:
+        {{- toYaml $labels | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: spire-cilium-restart
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: wait-spire-server
+          image: {{ .Values.spireRestart.image }}
+          args: [-n, cilium-spire, rollout, status, statefulset/spire-server, "--timeout={{ .Values.spireRestart.timeout }}"]
+          {{- include "cluster-bootstrap.container" . | nindent 10 }}
+        - name: wait-spire-agent
+          image: {{ .Values.spireRestart.image }}
+          args: [-n, cilium-spire, rollout, status, daemonset/spire-agent, "--timeout={{ .Values.spireRestart.timeout }}"]
+          {{- include "cluster-bootstrap.container" . | nindent 10 }}
+        - name: restart-cilium
+          image: {{ .Values.spireRestart.image }}
+          args: [-n, kube-system, rollout, restart, daemonset/cilium, deployment/cilium-operator]
+          {{- include "cluster-bootstrap.container" . | nindent 10 }}
+      containers:
+        - name: wait-cilium
+          image: {{ .Values.spireRestart.image }}
+          args: [-n, kube-system, rollout, status, daemonset/cilium, deployment/cilium-operator, "--timeout={{ .Values.spireRestart.timeout }}"]
+          {{- include "cluster-bootstrap.container" . | nindent 10 }}
+      volumes:
+        - { name: tmp, emptyDir: { sizeLimit: 16Mi } }
+{{- end }}

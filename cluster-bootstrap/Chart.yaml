@@ -1,0 +1,8 @@
+apiVersion: v2
+name: cluster-bootstrap
+description: >-
+  First layer of the GitOps tree: the namespaces (with their Pod Security, workload-profile and gVisor labels), the RuntimeClass `gvisor`
+  and the one-off Job that restarts Cilium once SPIRE is up (mutual authentication). Everything else waits for this.
+type: application
+version: 0.1.0
+appVersion: "1.0"

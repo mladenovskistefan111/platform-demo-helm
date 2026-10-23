@@ -17,6 +17,7 @@ nav:
   - GitOps: gitops.md
   - Local cluster: local-cluster.md
   - Single sign-on and the portal: sso-and-portal.md
+  - Secrets: secrets.md
   - Configure, develop, verify: develop.md
 theme:
   name: material

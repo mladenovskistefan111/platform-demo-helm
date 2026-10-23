@@ -6,48 +6,34 @@ the same checks as any change (no bypass). You click twice: once for stage, once
 
 ## The flow
 
+The pipeline lives in the **application repository**: after a merge, its **Publish** run builds, scans and signs the image, and then carries
+it through the environments, stopping at one approval click per environment. This repository holds the files and the checks (the Promotion
+policy, signature check, render, policy tests) that every promotion pull request must pass.
+
 ```
 developer: pull request in an app repository -> checks -> review -> merge
    |
-   v  (automatic) the app repository's publish workflow: build once, scan, sign, open the pull request promote/<app>/dev here, auto-merge
+   v  (automatic) Publish run in the app repository: build once, scan, sign, open the pull request promote/<app>/dev here, auto-merge
  DEV is deployed (envs/dev changed on main)
    |
-   v  (automatic) workflow "Promote to stage" starts by itself: Plan, then it WAITS
-   |      YOU: Actions -> the waiting run -> Review deployments -> tick `stage` -> Approve and deploy      (click 1)
-   v  one pull request promote/<app>/stage per app, checks, auto-merge
- STAGE is deployed (envs/stage changed on main; the version tag <app>-vX.Y.Z is made)
+   v  same run: "Approve stage deployment" WAITS
+   |      YOU: app repository -> Actions -> that Publish run -> Review deployments -> tick `stage` -> Approve and deploy      (click 1)
+   v  pull request promote/<app>/stage here, checks, auto-merge
+ STAGE is deployed (envs/stage changed on main; the release <app>-vX.Y.Z is made)
    |
-   v  (automatic) workflow "Promote to prod" starts by itself: Plan, then it WAITS
-   |      the `prod` reviewer: Actions -> the waiting run -> Review deployments -> tick `prod` -> Approve and deploy      (click 2)
-   v  one pull request promote/<app>/prod, checks, auto-merge
- PROD is deployed (envs/prod changed on main; nothing starts after this)
+   v  same run: "Approve prod deployment" WAITS
+   |      the `prod` reviewer: Review deployments -> tick `prod` -> Approve and deploy      (click 2)
+   v  pull request promote/<app>/prod here, checks, auto-merge
+ PROD is deployed (envs/prod changed on main)
 ```
 
-The environments are `dev`, `stage` and `prod` and nothing else.
+The environments are `dev`, `stage` and `prod` and nothing else. Nothing in this repository starts a promotion by itself; the two manual
+forms below are for the cases the pipeline does not cover.
 
 ## Where to click
 
-**Actions** -> the workflow **Promote to stage** (or **Promote to prod**) -> the run at the top (its title is the commit that started it, for
-example `promote(dev): shipping-service sha-aa29ba0`, with the label *Waiting*) -> **Review deployments** -> tick the environment ->
-**Approve and deploy** (or *Reject*). The run summary has a table of what will happen: app, version, the digest in the environment now and the
-digest it becomes. **One click covers every app of the run**; each app then gets its own pull request. The run ends with a **Result** job that
-lists the pull requests. GitHub notifies the reviewers of the environment when a run waits (according to their notification settings).
-
-Jobs of a run: `Plan` (read-only, shows the table), `Approve stage deployment` / `Approve prod deployment` (the click), `Promote <app>` (the
-pull request of one app), `Result`.
-
-## What starts a run, and what does not
-
-| Change on `main` | Starts |
-|---|---|
-| a pull request that changes the `image.digest` of an app in `envs/dev` (normally the automatic `promote(dev)` one) | **Promote to stage** |
-| a pull request that changes the `image.digest` of an app in `envs/stage` (a promotion to stage) | **Promote to prod** |
-| a change in `envs/prod` | nothing: the chain ends here |
-| a rollback (a commit titled `rollback(...)`, from the Rollback form), in any environment | nothing: rolling dev back never moves stage, rolling stage back never moves prod |
-| only a comment, the tag, the version comment or another line of a values file changed | nothing to promote: the run ends green without a click |
-
-One run handles all apps of one push, **plus the apps still waiting from an earlier change** (see below). A stage promotion also makes the
-tag and release `<app>-vX.Y.Z` (`stage-release.yaml`).
+In the **application repository**: **Actions** -> the **Publish** run of the merge (status *Waiting*) -> **Review deployments** -> tick the
+environment -> **Approve and deploy** (or *Reject*). A newer merge replaces an older run that still waits for the same click.
 
 ## The version
 
@@ -106,8 +92,7 @@ Actions -> **Rollback** -> Run workflow: pick the **app** (dropdown), the **env*
 
 Prod waits for the `prod` reviewer (Review deployments), as above. The rollback is a pull request too, so the signature and promotion checks apply
 to it. A rollback commit starts no promotion workflow, so nothing moves forward by itself afterwards; to go forward again run Rollback with
-`to = latest`, or let the next change in the previous environment start its normal run. If a **Promote to stage** run is waiting for the same app while
-you roll dev back, approving it fails the recheck and promotes nothing.
+`to = latest`, or let the next merge in the application repository carry its image through the pipeline again.
 
 ## What CI checks, and the one required check
 
@@ -118,7 +103,7 @@ exactly one status check: `gate`.**
 
 | Job (check name) | What it does |
 |---|---|
-| `Helm lint & render` | `helm lint`, render of every chart and environment (`render-envs.py`), the app dropdowns against the workloads (`check-dispatch-apps.py`) and the wiring of the promotion chain (`check-promotion-chain.py`) |
+| `Helm lint & render` | `helm lint`, render of every chart and environment (`render-envs.py`), the app dropdowns against the workloads (`check-dispatch-apps.py`) |
 | `kubeconform` | schema validation of everything rendered |
 | `Trivy config scan` | misconfiguration scan of the rendered charts |
 | `Cosign verify images` | every image of ours is pinned by digest and signed by an allowed workflow (below) |

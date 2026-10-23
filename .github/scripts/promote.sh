@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# The ONE implementation of "what does a promotion to stage / prod do", shared by the three promotion workflows:
-#   promote-stage.yaml  (automatic: a dev change)     promote-prod.yaml  (automatic: a stage change)     promote.yaml  (the manual form)
+# The ONE implementation of "what does a promotion to stage / prod do" for the manual form (promote.yaml). The automatic chain
+# runs in the application repositories (their Publish run) and opens its pull requests through gitops-promote.yaml.
 #
 #   promote.sh plan      read-only. Decides which apps are promoted, to which version, and prints it (run summary + job outputs).
 #   promote.sh recheck   runs AFTER the approval click: the plan is recomputed from the current main and must still be what was approved.

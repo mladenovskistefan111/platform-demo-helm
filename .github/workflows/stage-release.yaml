@@ -1,6 +1,6 @@
 name: Stage release
 
-# After a promotion to stage is merged, its version (computed by "Promote to stage", or typed in the Promote form) becomes a tag and a GitHub Release of THIS repository:
+# After a promotion to stage is merged, its version (computed by the application repository's Publish run, or typed in the Promote form) becomes a tag and a GitHub Release of THIS repository:
 # <app>-vX.Y.Z on the merge commit. The release notes hold the image digest, so the version stays answerable after stage has moved on.
 # Idempotent: it looks at the last commits that touched envs/stage/values and creates only the releases that are missing, so it can
 # also be started by hand (Actions -> Stage release) when a push did not trigger it. An existing tag is never moved.

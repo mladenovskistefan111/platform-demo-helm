@@ -78,17 +78,18 @@ The services export telemetry to `alloy.monitoring.svc.cluster.local` (or `--set
 
 ## Promote an image
 
-Nothing is typed and nothing is rebuilt. The chain is automatic up to two clicks:
+Nothing is typed and nothing is rebuilt. The pipeline runs in the **application repository** (its Publish run); this repository holds the
+state and the checks every change has to pass:
 
 ```
-merge in an app repository -> publish (build once, scan, sign) -> pull request promote/<app>/dev, auto-merged  = DEV deployed
-   -> "Promote to stage" starts by itself and waits:   Actions -> the waiting run -> Review deployments -> `stage` -> Approve   (click 1)
-   -> pull request promote/<app>/stage, auto-merged     = STAGE deployed (the version <app>-vX.Y.Z is computed: the next patch)
-   -> "Promote to prod" starts by itself and waits:     Actions -> the waiting run -> Review deployments -> `prod`  -> Approve   (click 2)
-   -> pull request promote/<app>/prod, auto-merged      = PROD deployed (nothing starts after this)
+merge in an app repository -> its Publish run: build once, scan, sign -> pull request promote/<app>/dev here, auto-merged  = DEV deployed
+   -> same run, in the app repository: "Approve stage deployment" waits   (Review deployments -> `stage` -> Approve)   (click 1)
+   -> pull request promote/<app>/stage here, auto-merged                   = STAGE deployed (version <app>-vX.Y.Z: the next patch)
+   -> same run: "Approve prod deployment" waits                            (Review deployments -> `prod`  -> Approve)   (click 2)
+   -> pull request promote/<app>/prod here, auto-merged                    = PROD deployed
 ```
 
-A newer change replaces a run that is still waiting; a rollback never starts a promotion. **Actions -> Promote** is the manual form (app
+A newer merge replaces a run that is still waiting. **Actions -> Promote** here is the manual form (several apps at once, or a version you choose) (app
 dropdown or `all`, env, and an optional `version` for a minor/major bump); it waits at the same approvals. **Actions -> Rollback** goes the other
 way (app, env, `previous` / `latest` / a digest / a git SHA). Details, the required check (`gate`) and the signer policy: [docs/promote.md](docs/promote.md).
 

@@ -13,7 +13,7 @@ operator:
   namespace: external-secrets
 
 # Only these namespaces may use the ClusterSecretStores (otherwise any namespace could read /platform-demo/* from SSM).
-allowedNamespaces: [backstage, sso, argocd, kyverno]
+allowedNamespaces: [backstage, sso, argocd, kyverno, platform-demo]
 
 # Prefix of every parameter (Terraform and the people who type the secrets use the same one).
 ssmPrefix: /platform-demo
@@ -44,6 +44,15 @@ kyverno:
   # kubernetes.io/dockerconfigjson with a read-only Docker Hub token (policies: verifyImages.pullSecret). Remove by setting false.
   dockerhubReadEnabled: true
   dockerhubSecretName: dockerhub-read
+
+# The shop's database credentials (product-catalog-db StatefulSet and product-catalog-service). Only the password is secret.
+shop:
+  enabled: true
+  namespace: platform-demo
+  secretName: product-catalog-db-credentials
+  database: product_catalog
+  user: catalog_user
+  passwordPath: product-catalog-db/postgres-password
 
 # Grafana is not deployed on AWS (yet): its OIDC client secret and the Backstage Grafana token are only read when this is true.
 grafana:

@@ -1,3 +1,3 @@
-# Credentials live in a Secret created outside Git (later: External Secrets); product-catalog-db is temporary and goes away with RDS.
+# Credentials: the Secret product-catalog-db-credentials, created by External Secrets (external-secrets-config/templates/shop.yaml) from Parameter Store.
 auth:
   existingSecret: product-catalog-db-credentials

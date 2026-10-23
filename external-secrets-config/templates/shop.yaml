@@ -1,0 +1,25 @@
+{{- if .Values.shop.enabled }}
+# platform-demo/product-catalog-db-credentials: the shop database's name, user and password. The database (a StatefulSet in the cluster, for
+# now) and product-catalog-service read this one Secret. Name and user are plain values; only the password comes from Parameter Store.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ .Values.shop.secretName }}
+  namespace: {{ .Values.shop.namespace }}
+  labels: {{- include "esc.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  refreshInterval: {{ .Values.refreshInterval }}
+  secretStoreRef: { kind: ClusterSecretStore, name: aws-parameter-store }
+  target:
+    name: {{ .Values.shop.secretName }}
+    creationPolicy: Owner
+    template:
+      data:
+        POSTGRES_DB: {{ .Values.shop.database | quote }}
+        POSTGRES_USER: {{ .Values.shop.user | quote }}
+        POSTGRES_PASSWORD: {{ `{{ .password }}` | quote }}
+  data:
+    {{- include "esc.ssm" (dict "root" . "key" "password" "path" .Values.shop.passwordPath) | nindent 4 }}
+{{- end }}

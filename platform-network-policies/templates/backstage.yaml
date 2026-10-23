@@ -1,0 +1,55 @@
+{{- if .Values.backstage.enabled }}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: backstage
+  namespace: backstage
+  labels:
+    {{- include "pnp.labels" . | nindent 4 }}
+spec:
+  description: >-
+    The portal is reached only through the Gateway. It needs DNS, the Kubernetes API (Kubernetes plugin), HTTPS (GitHub, the public Dex and
+    Argo CD URLs), the PostgreSQL database in the VPC (RDS), and anything in its own namespace.
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: backstage
+  ingress:
+    - fromEntities: [ingress]
+      toPorts:
+        - ports:
+            - { port: "7007", protocol: TCP }
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": backstage
+    {{- include "pnp.dns" . | nindent 4 }}
+    {{- include "pnp.apiserver" . | nindent 4 }}
+    {{- include "pnp.https" . | nindent 4 }}
+    - toCIDR: [{{ .Values.vpcCidr | quote }}]
+      toPorts:
+        - ports:
+            - { port: {{ .Values.databasePort | quote }}, protocol: TCP }
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": argocd
+            app.kubernetes.io/name: argocd-server
+      toPorts:
+        - ports:
+            - { port: "8080", protocol: TCP }
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: backstage-internal
+  namespace: backstage
+  labels:
+    {{- include "pnp.labels" . | nindent 4 }}
+spec:
+  description: Pods of the namespace may reach each other (the portal and a PostgreSQL pod, if the chart runs one).
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": backstage
+{{- end }}

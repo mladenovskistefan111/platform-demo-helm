@@ -1,0 +1,15 @@
+{{- range .Values.defaultDeny }}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: default-deny
+  namespace: {{ . }}
+  labels:
+    {{- include "pnp.labels" $ | nindent 4 }}
+spec:
+  description: Default deny in both directions (kubelet health probes are always allowed by Cilium); the other policies in this namespace add what is needed.
+  endpointSelector: {}
+  ingress: [{}]
+  egress: [{}]
+{{- end }}

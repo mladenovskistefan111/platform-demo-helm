@@ -1,0 +1,52 @@
+{{- if .Values.argocd.enabled }}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: argocd-internal
+  namespace: argocd
+  labels:
+    {{- include "pnp.labels" . | nindent 4 }}
+spec:
+  description: >-
+    Argo CD's components (server, repo-server, application-controller, ApplicationSet controller, Redis) talk to each other freely.
+    Egress: DNS, the Kubernetes API (they reconcile it), and HTTPS to the world (GitHub, Helm repositories, Dex through the ALB).
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": argocd
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": argocd
+    {{- include "pnp.dns" . | nindent 4 }}
+    {{- include "pnp.apiserver" . | nindent 4 }}
+    {{- include "pnp.https" . | nindent 4 }}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: argocd-server-ingress
+  namespace: argocd
+  labels:
+    {{- include "pnp.labels" . | nindent 4 }}
+spec:
+  description: The Gateway (Cilium Envoy, entity `ingress`) reaches the Argo CD API/UI; so may the listed namespaces in-cluster.
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-server
+  ingress:
+    - fromEntities: [ingress]
+      toPorts:
+        - ports:
+            - { port: "8080", protocol: TCP }
+    {{- range .Values.argocd.apiClients }}
+    - fromEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": {{ . }}
+      toPorts:
+        - ports:
+            - { port: "8080", protocol: TCP }
+    {{- end }}
+{{- end }}

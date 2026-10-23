@@ -1,0 +1,26 @@
+{{- if .Values.sso.enabled }}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: dex
+  namespace: sso
+  labels:
+    {{- include "pnp.labels" . | nindent 4 }}
+spec:
+  description: >-
+    Dex is reached only through the Gateway (browsers, and the applications that fetch the issuer URL through the NAT gateway and the ALB,
+    which also arrive as the `ingress` entity). It needs DNS, the Kubernetes API (its storage is custom resources) and HTTPS to GitHub.
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: dex
+  ingress:
+    - fromEntities: [ingress]
+      toPorts:
+        - ports:
+            - { port: "5556", protocol: TCP }
+  egress:
+    {{- include "pnp.dns" . | nindent 4 }}
+    {{- include "pnp.apiserver" . | nindent 4 }}
+    {{- include "pnp.https" . | nindent 4 }}
+{{- end }}

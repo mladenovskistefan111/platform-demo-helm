@@ -1,0 +1,18 @@
+# The shop in the STAGE environment (namespace stage-platform-demo). One line = one Argo CD Application
+# named stage-<app>. chart = directory at the repository root and must equal <app>; the namespace must be declared in
+# ../../clusters/main/values/cluster-bootstrap.yaml (CI checks that and the rest of the wiring, see docs/environments.md).
+# Optional per-entry field:  cluster: <name of a cluster registered in Argo CD>  (default in-cluster) - the hook for moving the shop to
+# its own cluster: register it, then put `cluster:` on every line.
+# The whole environment is switched off by replacing this list with `[]`.
+- { app: product-catalog-db,       chart: product-catalog-db,       namespace: stage-platform-demo }
+- { app: cart-redis,               chart: cart-redis,               namespace: stage-platform-demo }
+- { app: product-catalog-service,  chart: product-catalog-service,  namespace: stage-platform-demo }
+- { app: cart-service,             chart: cart-service,             namespace: stage-platform-demo }
+- { app: currency-service,         chart: currency-service,         namespace: stage-platform-demo }
+- { app: shipping-service,         chart: shipping-service,         namespace: stage-platform-demo }
+- { app: payment-service,          chart: payment-service,          namespace: stage-platform-demo }
+- { app: email-service,            chart: email-service,            namespace: stage-platform-demo }
+- { app: recommendation-service,   chart: recommendation-service,   namespace: stage-platform-demo }
+- { app: ad-service,               chart: ad-service,               namespace: stage-platform-demo }
+- { app: checkout-service,         chart: checkout-service,         namespace: stage-platform-demo }
+- { app: frontend,                 chart: frontend,                 namespace: stage-platform-demo }

@@ -6,12 +6,14 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-10"
 spec:
-  description: The shop (envs/<env>/workloads.yaml). One namespace, namespaced resources only, no quota or limit changes. Destinations list the clusters it may target.
+  description: The shop, all environments (envs/<env>/workloads.yaml). One namespace per environment, namespaced resources only, no quota or limit changes. CI checks that every workloads.yaml names only the destinations listed here.
   sourceRepos:
     - https://github.com/platform-boutique/platform-demo-helm.git
   destinations:
-    - { name: in-cluster, namespace: platform-demo }
-    # A second cluster for the shop: register it in Argo CD, then add
+    - { name: in-cluster, namespace: platform-demo }         # prod
+    - { name: in-cluster, namespace: stage-platform-demo }
+    - { name: in-cluster, namespace: dev-platform-demo }
+    # A second cluster for the shop: register it in Argo CD, then add its namespaces, e.g.
     #   - { name: <cluster>, namespace: platform-demo }
   clusterResourceWhitelist: []
   namespaceResourceBlacklist:

@@ -1,4 +1,4 @@
-# Layer "workloads": the shop (envs/<env>/workloads.yaml). Same wave as platform on purpose: it needs the security layer, not Dex or Backstage.
+# Layer "workloads": the shop, all environments (envs/<env>/workloads.yaml). Same wave as platform on purpose: it needs the security layer, not Dex or Backstage.
 # Sync wave 20 of platform-root: Argo CD syncs the layer, then waits until every Application in it is Healthy before it starts the
 # next wave. Deleting this file (or the layer's directory contents) removes the layer and, through the finalizer, everything in it.
 apiVersion: argoproj.io/v1alpha1

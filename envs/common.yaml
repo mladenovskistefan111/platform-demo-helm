@@ -1,0 +1,12 @@
+# Settings that are IDENTICAL in every environment (dev, stage, prod) and nothing else. Value files, later ones win: this file, then
+# envs/<env>/common.yaml (sizing profile of the environment), then envs/<env>/values/<app>.yaml. A change here reaches all three
+# environments at once, prod included, so anything that may ever differ per environment belongs in envs/<env>/common.yaml.
+global:
+  networkPolicy:
+    type: cilium        # CiliumNetworkPolicy with SPIFFE/SPIRE mutual authentication (see platform-common)
+# Mutual authentication is ON (the chart default, stated here on purpose): every rule between two services requires a SPIFFE identity.
+# It needs SPIRE, which Terraform installs with Cilium; gitops/layers/bootstrap restarts Cilium once SPIRE is up, before this layer syncs.
+# The rules select pods of the policy's OWN namespace (see platform-common), so dev, stage and prod cannot talk to each other.
+networkPolicy:
+  cilium:
+    authentication: required

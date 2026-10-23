@@ -1,7 +1,9 @@
-# One Application per (environment, workload). Adding a workload = one line in envs/<env>/workloads.yaml (its namespace must be declared in
-# envs/<env>/values/cluster-bootstrap.yaml). Promotion = a PR that changes image.digest in envs/<env>/values/<app>.yaml.
-# The whole layer is switched off by `[]` in envs/<env>/workloads.yaml. An entry may carry `cluster: <name>` (default in-cluster) for
-# the day the shop moves to its own cluster.
+# The shop: one Application per (environment, workload), named <env>-<app> (dev-frontend, stage-frontend, prod-frontend; the name must be
+# unique across environments and the Backstage plugins split it at the first dash). Adding a workload = one line in
+# envs/<env>/workloads.yaml (its namespace must be declared in clusters/main/values/cluster-bootstrap.yaml). Promotion = a PR that changes
+# image.tag and image.digest in envs/<env>/values/<app>.yaml. Value files, later ones win: envs/common.yaml (only what is identical
+# in every environment), envs/<env>/common.yaml (sizing of the environment), envs/<env>/values/<app>.yaml (per app). An environment is switched off by `[]` in its workloads.yaml.
+# An entry may carry `cluster: <name>` (default in-cluster) for the day the shop moves to its own cluster.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -37,12 +39,13 @@ spec:
           releaseName: '{{ .app }}'
           ignoreMissingValueFiles: true
           valueFiles:
-            - '../envs/{{ .values.env }}/values/common.yaml'
+            - '../envs/common.yaml'
+            - '../envs/{{ .values.env }}/common.yaml'
             - '../envs/{{ .values.env }}/values/{{ .app }}.yaml'
       destination: { name: '{{ index . "cluster" | default "in-cluster" }}', namespace: '{{ .namespace }}' }
       syncPolicy:
         automated: { prune: true, selfHeal: true }
-        # The namespace (restricted, workload profile, gVisor) is declared in envs/<env>/values/cluster-bootstrap.yaml, not created here.
+        # The namespace (restricted, workload profile, gVisor) is declared in clusters/main/values/cluster-bootstrap.yaml, not created here.
         syncOptions: [ServerSideApply=true, PruneLast=true]
         retry:
           limit: 6

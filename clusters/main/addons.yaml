@@ -1,0 +1,6 @@
+# Platform add-ons of the cluster `main` (not the shop; that is envs/<env>/workloads.yaml). chart = directory at the repo root; the
+# namespace must be declared in values/cluster-bootstrap.yaml - CI checks that. One line adds an add-on; each becomes the Argo CD
+# Application <app> (no prefix: platform names carry neither an environment nor a cluster). Values: values/<app>.yaml (optional).
+- { app: platform-gateway, chart: platform-gateway, namespace: gateway-system }
+- { app: dex,              chart: dex,              namespace: sso }
+- { app: backstage,        chart: backstage,        namespace: backstage }

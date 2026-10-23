@@ -1,4 +1,4 @@
-# dev = the AWS (EKS) environment. The catalog comes from the GitHub organisation (app-config.github.yaml, needs GITHUB_TOKEN, which
+# Cluster main (AWS, EKS). The catalog comes from the GitHub organisation (app-config.github.yaml, needs GITHUB_TOKEN, which
 # External Secrets Operator puts into backstage-secrets from SSM /platform-demo/github/token). The database is the RDS instance
 # platform-demo-backstage; its endpoint and credentials arrive through the same Secret.
 domain: platform-demo.click

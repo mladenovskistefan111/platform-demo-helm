@@ -19,7 +19,7 @@ spec:
       releaseName: platform-network-policies
       ignoreMissingValueFiles: true
       valueFiles:
-        - ../envs/dev/values/platform-network-policies.yaml
+        - ../clusters/main/values/platform-network-policies.yaml
   destination: { name: in-cluster, namespace: argocd }
   syncPolicy:
     automated: { prune: true, selfHeal: true }

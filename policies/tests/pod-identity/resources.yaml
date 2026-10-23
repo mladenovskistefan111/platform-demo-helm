@@ -3,6 +3,18 @@ kind: Namespace
 metadata: { name: platform-demo, labels: { kubernetes.io/metadata.name: platform-demo } }
 ---
 apiVersion: v1
+kind: Namespace
+metadata: { name: dev-platform-demo, labels: { kubernetes.io/metadata.name: dev-platform-demo } }
+---
+apiVersion: v1
+kind: Namespace
+metadata: { name: stage-platform-demo, labels: { kubernetes.io/metadata.name: stage-platform-demo } }
+---
+apiVersion: v1
+kind: Namespace
+metadata: { name: qa-platform-demo, labels: { kubernetes.io/metadata.name: qa-platform-demo } }
+---
+apiVersion: v1
 kind: Pod
 metadata: { name: good, namespace: platform-demo, labels: { app.kubernetes.io/name: frontend } }
 spec: { serviceAccountName: frontend, containers: [{ name: c, image: "mladenovskistefan/frontend@sha256:aa" }] }
@@ -26,3 +38,31 @@ apiVersion: v1
 kind: Pod
 metadata: { name: no-label, namespace: platform-demo }
 spec: { serviceAccountName: default, containers: [{ name: c, image: "x" }] }
+---
+# The other shop environments are policed exactly like production (scopes.workload lists their namespaces)
+apiVersion: v1
+kind: Pod
+metadata: { name: good-dev, namespace: dev-platform-demo, labels: { app.kubernetes.io/name: frontend } }
+spec: { serviceAccountName: frontend, containers: [{ name: c, image: "mladenovskistefan/frontend@sha256:aa" }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: good-stage, namespace: stage-platform-demo, labels: { app.kubernetes.io/name: frontend } }
+spec: { serviceAccountName: frontend, containers: [{ name: c, image: "mladenovskistefan/frontend@sha256:aa" }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: unknown-name-dev, namespace: dev-platform-demo, labels: { app.kubernetes.io/name: miner } }
+spec: { serviceAccountName: miner, containers: [{ name: c, image: "x" }] }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: stolen-label-stage, namespace: stage-platform-demo, labels: { app.kubernetes.io/name: frontend } }
+spec: { serviceAccountName: default, containers: [{ name: c, image: "x" }] }
+---
+# A namespace that is NOT listed in scopes.workload is not policed at all: this is why render-envs.py fails when an environment's
+# namespace is missing from the list. (Documents the failure mode; nothing is expected to deploy there.)
+apiVersion: v1
+kind: Pod
+metadata: { name: unlisted-namespace, namespace: qa-platform-demo, labels: { app.kubernetes.io/name: miner } }
+spec: { serviceAccountName: miner, containers: [{ name: c, image: "x" }] }

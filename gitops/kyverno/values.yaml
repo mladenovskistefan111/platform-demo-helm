@@ -63,7 +63,7 @@ features:
 
 config:
   # Namespaces whose objects never reach Kyverno. These run the CNI and SPIRE: a Kyverno outage must not stop them
-  # (webhook deadlock), and they are not ours to police. argocd, backstage and sso are policed (report only), platform-demo enforced.
+  # (webhook deadlock), and they are not ours to police. argocd, backstage and sso are policed (report only), the shop namespaces (platform-demo, stage-platform-demo, dev-platform-demo) enforced.
   webhooks:
     namespaceSelector:
       matchExpressions:

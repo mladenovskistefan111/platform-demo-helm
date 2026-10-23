@@ -7,8 +7,8 @@ policies:
 resources:
   - resources.yaml
 results:
-  - { policy: pd-pod-identity, isValidatingPolicy: true, kind: Pod, resources: [good], result: pass }
-  - { policy: pd-pod-identity, isValidatingPolicy: true, kind: Pod, resources: [stolen-label-default-sa], result: fail }
+  - { policy: pd-pod-identity, isValidatingPolicy: true, kind: Pod, resources: [good, good-dev, good-stage, unlisted-namespace], result: pass }
+  - { policy: pd-pod-identity, isValidatingPolicy: true, kind: Pod, resources: [stolen-label-default-sa, stolen-label-stage], result: fail }
   - { policy: pd-pod-identity, isValidatingPolicy: true, kind: Pod, resources: [stolen-label-other-sa], result: fail }
-  - { policy: pd-pod-identity, isValidatingPolicy: true, kind: Pod, resources: [unknown-name], result: fail }
+  - { policy: pd-pod-identity, isValidatingPolicy: true, kind: Pod, resources: [unknown-name, unknown-name-dev], result: fail }
   - { policy: pd-pod-identity, isValidatingPolicy: true, kind: Pod, resources: [no-label], result: fail }

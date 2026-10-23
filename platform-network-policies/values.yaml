@@ -1,5 +1,5 @@
 # Network policy for the platform namespaces, in one place so that "who may talk to whom" is reviewed together.
-# The shop (platform-demo) is different: Kyverno generates its default-deny, every service chart brings its own allow rules with
+# The shop namespaces (platform-demo, stage-platform-demo, dev-platform-demo) are different: Kyverno generates its default-deny, every service chart brings its own allow rules with
 # SPIFFE mutual authentication (platform-common). Platform components talk to the outside world and to each other through the
 # Gateway, so they get plain identity-based rules, no mutual authentication.
 

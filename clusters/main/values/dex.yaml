@@ -1,4 +1,4 @@
-# dev = the AWS (EKS) environment. The only way in is GitHub: the OAuth App of the organisation (callback
+# Cluster main (AWS, EKS). The only way in is GitHub: the OAuth App of the organisation (callback
 # https://dex.platform-demo.click/callback); its id and secret, and the client secrets shared with Argo CD and Backstage, arrive in the
 # `dex-secrets` Secret from AWS SSM through External Secrets (docs/secrets.md). There are no local passwords.
 domain: platform-demo.click

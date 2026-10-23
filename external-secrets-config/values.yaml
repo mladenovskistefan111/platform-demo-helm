@@ -1,0 +1,51 @@
+# ExternalSecrets and stores for AWS. Every SSM path used is listed in docs/secrets.md. Requires the CRDs of External Secrets
+# Operator (Argo CD retries until they exist: SkipDryRunOnMissingResource in the Application).
+
+region: us-east-1
+
+# How often each Secret is read again from AWS. Short enough for the RDS password (rotated by RDS every 7 days; Reloader then
+# restarts the pods that mount it), long enough not to hit the SSM API limits.
+refreshInterval: 1h
+
+# ServiceAccount of the operator, pre-created by Terraform with the IAM role annotation (IRSA); the stores sign in with its token.
+operator:
+  serviceAccountName: external-secrets
+  namespace: external-secrets
+
+# Only these namespaces may use the ClusterSecretStores (otherwise any namespace could read /platform-demo/* from SSM).
+allowedNamespaces: [backstage, sso, argocd, kyverno]
+
+# Prefix of every parameter (Terraform and the people who type the secrets use the same one).
+ssmPrefix: /platform-demo
+
+rds:
+  # Secrets Manager secret that RDS manages for the master user (JSON {username,password}): name (rds!db-<uuid>) or ARN.
+  # `aws rds describe-db-instances --db-instance-identifier platform-demo-backstage --query 'DBInstances[0].MasterUserSecret.SecretArn'`
+  # or the Terraform output. Set it per environment in envs/<env>/values/external-secrets-config.yaml.
+  masterSecretId: "rds!db-REPLACE-WITH-THE-SECRET-OF-platform-demo-backstage"
+  # SSM String parameters written by Terraform: <ssmPrefix>/rds/backstage/{host,port,username}.
+  ssmPath: rds/backstage
+
+backstage:
+  namespace: backstage
+  secretName: backstage-secrets
+
+dex:
+  namespace: sso
+  secretName: dex-secrets
+
+argocd:
+  namespace: argocd
+  # Referenced from oidc.config as $argocd-oidc:clientSecret (gitops/argocd/values.yaml). Argo CD only dereferences Secrets labelled
+  # app.kubernetes.io/part-of=argocd.
+  oidcSecretName: argocd-oidc
+
+kyverno:
+  namespace: kyverno
+  # kubernetes.io/dockerconfigjson with a read-only Docker Hub token (policies: verifyImages.pullSecret). Remove by setting false.
+  dockerhubReadEnabled: true
+  dockerhubSecretName: dockerhub-read
+
+# Grafana is not deployed on AWS (yet): its OIDC client secret and the Backstage Grafana token are only read when this is true.
+grafana:
+  enabled: false

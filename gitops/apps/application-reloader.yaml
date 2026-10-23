@@ -1,0 +1,51 @@
+# Stakater Reloader: restarts a Deployment when a Secret/ConfigMap it names changes. Needed because RDS rotates the Backstage database
+# password every 7 days: External Secrets updates the Secret within an hour, Reloader rolls the pod (annotation
+# secret.reloader.stakater.com/reload on the Deployment, set by the backstage and dex charts).
+# Scoped mode: Roles only in the listed namespaces (no cluster-wide permission to read Secrets).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: reloader
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: secrets
+  source:
+    repoURL: https://stakater.github.io/stakater-charts
+    chart: reloader
+    targetRevision: 2.2.18
+    helm:
+      releaseName: reloader
+      valuesObject:
+        reloader:
+          watchGlobally: false
+          namespaces: [backstage, sso]
+          # Add an annotation to the pod template instead of an environment variable: the diff Argo CD sees stays out of the way.
+          reloadStrategy: annotations
+          readOnlyRootFileSystem: true
+          # Only workloads that opt in (annotation) are restarted.
+          autoReloadAll: false
+          deployment:
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 65534
+              seccompProfile: { type: RuntimeDefault }
+            containerSecurityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities: { drop: [ALL] }
+            resources:
+              requests: { cpu: 10m, memory: 32Mi }
+              limits: { memory: 128Mi }
+  destination: { name: in-cluster, namespace: reloader }
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true, ServerSideApply=true]
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: restricted
+    retry:
+      limit: 6
+      backoff: { duration: 10s, factor: 2, maxDuration: 3m }

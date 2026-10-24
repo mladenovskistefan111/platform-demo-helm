@@ -1,3 +1,3 @@
 image:
-  tag: "1.0.0"
-  digest: sha256:2ccac2cddeb4ff3759adbfe96e628379bcadb2fed82f201171ae134de286390f   # v1.0.0
+  tag: "sha-4ce49d2"
+  digest: sha256:96dd2c4ef9a327026ceb6e8dc374de8b0c2feb7a94ad2e8b51102017a6988cfe   # v1.0.1
